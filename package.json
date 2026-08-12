@@ -1,0 +1,30 @@
+{
+  "name": "clinicos",
+  "version": "0.0.1",
+  "description": "ClinicOS - Universal Clinic Operating System",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@8.0.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint",
+    "type-check": "pnpm -r --filter='./apps/**' run type-check && pnpm -r --filter='./packages/shared-types' run type-check",
+    "db:migrate": "cd packages/database && pnpm prisma migrate deploy",
+    "db:generate": "cd packages/database && pnpm prisma generate",
+    "db:seed": "cd packages/database && pnpm prisma db seed",
+    "db:reset": "cd packages/database && pnpm prisma migrate reset --force",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.1.0"
+  }
+}

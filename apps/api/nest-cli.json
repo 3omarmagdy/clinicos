@@ -1,0 +1,9 @@
+{
+  "name": "clinicos-api",
+  "version": "0.0.1",
+  "description": "ClinicOS Backend API",
+  "author": "ClinicOS Team",
+  "license": "MIT",
+  "$schema": "node_modules/@nestjs/cli/lib/config/schema.json",
+  "sourceRoot": "src"
+}

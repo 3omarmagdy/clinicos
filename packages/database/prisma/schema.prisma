@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// MULTI-TENANT FOUNDATION
+// ============================================================================
+
+/// Organization is the root tenant entity. All data is isolated by organization.
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  timezone  String   @default("UTC")
+  currency  String   @default("EGP")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  locations   Location[]
+  departments Department[]
+  users       User[]
+  roles       Role[]
+
+  @@map("organizations")
+}
+
+// ============================================================================
+// LOCATION / MULTI-LOCATION SUPPORT
+// ============================================================================
+
+/// Location represents a physical or virtual clinic site within an organization.
+model Location {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  address        String
+  phone          String
+  email          String
+  timezone       String
+  status         String   @default("active") // active | inactive
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relationships
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departments  Department[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@map("locations")
+}
+
+// ============================================================================
+// DEPARTMENTS / SPECIALTIES
+// ============================================================================
+
+/// Department represents a specialty unit or functional department within a location.
+model Department {
+  id               String   @id @default(cuid())
+  organizationId   String
+  locationId       String
+  name             String
+  specialtyModule  String   @default("general") // general | dentistry | dermatology | etc.
+  status           String   @default("active")  // active | inactive
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relationships
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, locationId, id])
+  @@index([organizationId, locationId])
+  @@map("departments")
+}
+
+// ============================================================================
+// USERS / ROLES / PERMISSIONS
+// ============================================================================
+
+/// User represents any person interacting with the system.
+model User {
+  id             String   @id @default(cuid())
+  organizationId String
+  email          String
+  passwordHash   String
+  firstName      String
+  lastName       String
+  role           String   @default("receptionist") // owner | admin | doctor | receptionist | nurse | accountant | custom
+  status         String   @default("active")       // active | inactive | suspended
+  lastLoginAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relationships
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userRoles    UserRole[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId, email])
+  @@map("users")
+}
+
+/// Role represents a set of permissions.
+model Role {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  isBuiltIn      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relationships
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  permissions     RolePermission[]
+  userRoles       UserRole[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("roles")
+}
+
+/// Permission represents an atomic action that can be authorized.
+/// Examples: patient:read, patient:create, billing:read, billing:create
+model Permission {
+  id        String   @id @default(cuid())
+  code      String   @unique // e.g., "patient:read", "billing:create"
+  category  String   // e.g., "patient", "billing", "user", "admin"
+  description String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  roles RolePermission[]
+
+  @@index([category])
+  @@map("permissions")
+}
+
+/// RolePermission is the join table between Role and Permission.
+model RolePermission {
+  id           String @id @default(cuid())
+  roleId       String
+  permissionId String
+
+  // Relationships
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// UserRole is the join table between User and Role.
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  roleId String
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId, roleId])
+  @@map("user_roles")
+}

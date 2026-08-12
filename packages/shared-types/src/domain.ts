@@ -1,0 +1,115 @@
+/**
+ * Core Domain Types for ClinicOS
+ * These types are shared between frontend and backend
+ */
+
+// Organization
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  timezone: string;
+  currency: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CreateOrganizationDTO = Omit<Organization, 'id' | 'createdAt' | 'updatedAt'>;
+
+// Location
+export interface Location {
+  id: string;
+  organizationId: string;
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  timezone: string;
+  status: 'active' | 'inactive';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CreateLocationDTO = Omit<Location, 'id' | 'createdAt' | 'updatedAt'>;
+
+// Department
+export interface Department {
+  id: string;
+  organizationId: string;
+  locationId: string;
+  name: string;
+  specialtyModule: string;
+  status: 'active' | 'inactive';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CreateDepartmentDTO = Omit<Department, 'id' | 'createdAt' | 'updatedAt'>;
+
+// User
+export interface User {
+  id: string;
+  organizationId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: 'owner' | 'admin' | 'doctor' | 'receptionist' | 'nurse' | 'accountant' | 'custom';
+  status: 'active' | 'inactive' | 'suspended';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CreateUserDTO = Omit<User, 'id' | 'createdAt' | 'updatedAt'> & {
+  password: string;
+};
+
+export type UserWithoutPassword = Omit<User, never>;
+
+// Role
+export interface Role {
+  id: string;
+  organizationId: string;
+  name: string;
+  description?: string;
+  isBuiltIn: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Permission
+export interface Permission {
+  id: string;
+  code: string;
+  description: string;
+  category: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// API Response Types
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+export interface PaginatedResponse<T> {
+  success: boolean;
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+  };
+}
+
+// Error Types
+export interface ApiError {
+  code: string;
+  message: string;
+  statusCode: number;
+  details?: Record<string, unknown>;
+}
