@@ -42,7 +42,7 @@ export default function Home() {
                 Login
               </Link>
               <Link
-                href="/api/health"
+                href="http://localhost:3001/api/v1/health"
                 target="_blank"
                 className="px-6 py-3 bg-slate-200 text-slate-900 rounded-lg font-medium hover:bg-slate-300 transition"
               >

@@ -5,6 +5,7 @@ import { useState, FormEvent } from 'react';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [organizationSlug, setOrganizationSlug] = useState('dev-clinic');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -14,13 +15,14 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3001/api/v1/auth/login', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, organizationSlug }),
       });
 
-      if (!response.ok) throw new Error('Login failed');
+      if (!response.ok) throw new Error('Invalid email, password, or clinic code');
 
       const data = await response.json();
       localStorage.setItem('token', data.accessToken);
@@ -43,12 +45,26 @@ export default function LoginPage() {
           {error && <div className="bg-red-50 text-red-700 p-3 rounded text-sm">{error}</div>}
 
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Clinic code</label>
+            <input
+              type="text"
+              value={organizationSlug}
+              onChange={(e) => setOrganizationSlug(e.target.value)}
+              placeholder="dev-clinic"
+              autoComplete="organization"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="owner@dev.local"
+              autoComplete="email"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
@@ -61,6 +77,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="dev_password_123"
+              autoComplete="current-password"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />

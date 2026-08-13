@@ -10,7 +10,7 @@
     "build": "nest build",
     "start": "node dist/main",
     "debug": "nest start --debug 9229",
-    "lint": "eslint \"{src,test}/**/*.ts\" --fix",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",

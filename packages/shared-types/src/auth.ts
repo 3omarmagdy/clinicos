@@ -5,6 +5,7 @@
 export interface LoginCredentials {
   email: string;
   password: string;
+  organizationSlug: string;
 }
 
 export interface AuthToken {
@@ -19,8 +20,8 @@ export interface JwtPayload {
   organizationId: string;
   role: string;
   permissions: string[];
-  iat: number;
-  exp: number;
+  iat?: number;
+  exp?: number;
 }
 
 export interface AuthContext {

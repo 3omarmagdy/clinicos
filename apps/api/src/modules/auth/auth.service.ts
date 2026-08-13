@@ -16,11 +16,14 @@ export class AuthService {
   ) {}
 
   async login(credentials: LoginCredentials): Promise<AuthToken> {
-    const { email, password } = credentials;
+    const { email, password, organizationSlug } = credentials;
 
     // Find user by email
     const user = await this.prisma.user.findFirst({
-      where: { email },
+      where: {
+        email,
+        organization: { slug: organizationSlug },
+      },
       include: {
         userRoles: {
           include: {
@@ -70,8 +73,6 @@ export class AuthService {
       organizationId: user.organizationId,
       role: user.role,
       permissions: Array.from(permissions),
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 15 * 60, // 15 minutes
     };
 
     const accessToken = this.jwtService.sign(payload);

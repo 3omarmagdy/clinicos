@@ -7,9 +7,13 @@ export class OrganizationService {
 
   constructor(private prisma: PrismaService) {}
 
-  async getOrganization(id: string): Promise<Organization | null> {
+  async getOrganization(id: string, organizationId: string): Promise<Organization | null> {
+    if (id !== organizationId) {
+      return null;
+    }
+
     return this.prisma.organization.findUnique({
-      where: { id },
+      where: { id: organizationId },
     });
   }
 
