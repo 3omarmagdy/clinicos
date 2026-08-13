@@ -998,6 +998,14 @@ Patient Management was implemented after the foundation handoff. It includes the
 
 The next recommended milestone is Doctor and appointment scheduling, using the patient relationship and the existing organization/location/department hierarchy.
 
+\# Tooling and Visual Review Checkpoint
+
+The original root `dev` script used the invalid pnpm filter `./apps/**`, which caused `pnpm dev` to report that no projects matched. It now targets the named workspace packages `@clinicos/api` and `@clinicos/web`, after building `@clinicos/shared-types`.
+
+For a fresh clone, use Node `22.23.2` and pnpm `10.34.5`, then run `pnpm install --frozen-lockfile`, copy `.env.example` to `.env`, run `pnpm docker:up`, `pnpm db:migrate`, `pnpm db:seed`, and finally `pnpm dev`. The web UI is served at `http://localhost:3000`; the API listens at `http://localhost:3001`.
+
+Docker Desktop with the Linux engine running is a local prerequisite for the PostgreSQL container. A Docker connection failure is an environment prerequisite, not a repository tooling failure. Prisma is intentionally installed in `@clinicos/database`, and root database scripts invoke it through that workspace rather than relying on a global Prisma executable.
+
 \# Definition Of Done
 
 

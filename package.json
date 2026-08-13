@@ -6,7 +6,7 @@
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
-    "dev": "pnpm --filter @clinicos/shared-types build && pnpm -r --parallel --filter './apps/**' run dev",
+    "dev": "pnpm --filter @clinicos/shared-types run build && pnpm --parallel --filter @clinicos/api --filter @clinicos/web run dev",
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
     "lint": "pnpm -r run lint",
