@@ -992,6 +992,12 @@ Database
 
 
 
+\# Patient Management Update
+
+Patient Management was implemented after the foundation handoff. It includes the organization-scoped `Patient` Prisma model and migration `0002_add_patients`, protected API endpoints at `/api/v1/patients`, shared patient contracts, patient permissions, and a dashboard-linked patient registry/create screen. All patient reads and mutations derive the organization from the JWT and never accept a tenant ID from the client.
+
+The next recommended milestone is Doctor and appointment scheduling, using the patient relationship and the existing organization/location/department hierarchy.
+
 \# Definition Of Done
 
 

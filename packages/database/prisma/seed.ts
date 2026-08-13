@@ -114,6 +114,7 @@ async function main() {
     // Patient placeholder (for future)
     { code: 'patient:read', category: 'patient' },
     { code: 'patient:create', category: 'patient' },
+    { code: 'patient:update', category: 'patient' },
     // Appointment placeholder (for future)
     { code: 'appointment:read', category: 'appointment' },
     { code: 'appointment:create', category: 'appointment' },

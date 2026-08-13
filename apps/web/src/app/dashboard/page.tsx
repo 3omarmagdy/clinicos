@@ -77,6 +77,9 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+        <div className="mt-6 border-t border-slate-200 pt-6">
+          <Link href="/patients" className="inline-flex rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-800">Manage patients</Link>
+        </div>
       </section>
     </main>
   );

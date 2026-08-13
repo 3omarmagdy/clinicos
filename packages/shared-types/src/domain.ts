@@ -46,6 +46,28 @@ export interface Department {
 
 export type CreateDepartmentDTO = Omit<Department, 'id' | 'createdAt' | 'updatedAt'>;
 
+// Patient
+export interface Patient {
+  id: string;
+  organizationId: string;
+  medicalRecordNumber: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: Date | null;
+  gender?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  status: 'active' | 'inactive';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CreatePatientDTO = Omit<Patient, 'id' | 'organizationId' | 'createdAt' | 'updatedAt'>;
+export type UpdatePatientDTO = Partial<CreatePatientDTO>;
+
 // User
 export interface User {
   id: string;

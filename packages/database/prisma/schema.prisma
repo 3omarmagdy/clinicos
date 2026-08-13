@@ -26,8 +26,40 @@ model Organization {
   departments Department[]
   users       User[]
   roles       Role[]
+  patients    Patient[]
 
   @@map("organizations")
+}
+
+// ============================================================================
+// PATIENTS
+// ============================================================================
+
+/// Patient is an organization-scoped clinical identity. It intentionally does
+/// not belong to one location so a patient can receive care across the tenant.
+model Patient {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  medicalRecordNumber String
+  firstName           String
+  lastName            String
+  dateOfBirth         DateTime?
+  gender              String?
+  phone               String?
+  email               String?
+  address             String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  status              String    @default("active") // active | inactive
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, medicalRecordNumber])
+  @@index([organizationId, lastName, firstName])
+  @@index([organizationId, phone])
+  @@map("patients")
 }
 
 // ============================================================================
