@@ -1,0 +1,78 @@
+name: CI - Lint, Type Check, Build
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: clinicos
+          POSTGRES_PASSWORD: clinicos_dev
+          POSTGRES_DB: clinicos_dev
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run type check
+        run: pnpm type-check
+
+      - name: Run linting
+        run: pnpm lint
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Generate Prisma Client
+        env:
+          DATABASE_URL: postgresql://clinicos:clinicos_dev@localhost:5432/clinicos_dev
+        run: cd packages/database && pnpm prisma generate
+
+  build:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build backend
+        run: cd apps/api && pnpm build
+
+      - name: Build frontend
+        run: cd apps/web && pnpm build

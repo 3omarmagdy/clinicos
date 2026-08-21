@@ -1,0 +1,2 @@
+Name,Phone,Email,DateOfBirth,AdmissionDate,Gender,MaritalStatus,Occupation,City,Governorate,LeadSource,MarketingConsent
+Example Patient,01000000000,example@example.com,1990-01-15,2026-08-20,female,married,Teacher,مدينة نصر,القاهرة,Previous CRM,false
