@@ -6,6 +6,7 @@ import { BrandMark } from '@/components/brand-mark';
 
 export default function LoginPage() {
   const isDevelopment = process.env.NODE_ENV !== 'production';
+  const isPublicDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [organizationSlug, setOrganizationSlug] = useState('dev-clinic');
@@ -14,6 +15,10 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isPublicDemo) {
+      setError('هذه نسخة تعريفية عامة ولا تحتوي على قاعدة بيانات مرضى. تواصل معنا لطلب تجربة خاصة وآمنة.');
+      return;
+    }
     setLoading(true);
     setError('');
 
@@ -41,6 +46,7 @@ export default function LoginPage() {
     <div dir="rtl" className="min-h-screen bg-slate-950 px-4 py-10 sm:py-16"><div className="mx-auto max-w-md"><BrandMark light /><div className="mt-10 rounded-2xl bg-white p-7 shadow-2xl sm:p-9"><h1 className="text-3xl font-bold text-slate-950">دخول آمن لمساحة عيادتك</h1><p className="mt-2 text-slate-600">بيانات كل مركز تبقى منفصلة عن أي مركز آخر.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isPublicDemo && <div className="rounded-lg bg-sky-50 p-3 text-sm text-sky-900">نسخة تعريفية عامة: تسجيل الدخول وبيانات المرضى غير متاحين لحماية الخصوصية.</div>}
           {error && <div className="bg-red-50 text-red-700 p-3 rounded text-sm">{error}</div>}
 
           <div>
@@ -84,10 +90,10 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isPublicDemo}
             className="w-full py-3 bg-teal-600 text-white rounded-lg font-bold hover:bg-teal-700 disabled:bg-slate-400 transition"
           >
-            {loading ? 'جارٍ الدخول…' : 'دخول النظام'}
+            {isPublicDemo ? 'نسخة تعريفية' : loading ? 'جارٍ الدخول…' : 'دخول النظام'}
           </button>
         </form>
 
