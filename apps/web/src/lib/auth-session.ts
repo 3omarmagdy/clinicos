@@ -38,3 +38,16 @@ export function hasSessionPermission(permission: string): boolean {
     return false;
   }
 }
+
+export function isPlatformAdminSession(): boolean {
+  const accessToken = getAccessToken();
+  if (!accessToken) return false;
+  try {
+    const payload = accessToken.split('.')[1];
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = JSON.parse(window.atob(normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=')));
+    return decoded.isPlatformAdmin === true;
+  } catch {
+    return false;
+  }
+}

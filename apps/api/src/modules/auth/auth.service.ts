@@ -25,6 +25,9 @@ export class AuthService {
         organization: { slug: organizationSlug },
       },
       include: {
+        organization: {
+          select: { subscriptionStatus: true, trialEndsAt: true, subscriptionEndsAt: true },
+        },
         userRoles: {
           include: {
             role: {
@@ -51,6 +54,17 @@ export class AuthService {
       throw new UnauthorizedException('User account is inactive');
     }
 
+    // A platform owner can always enter the platform console. Clinic users are
+    // blocked when their trial/subscription ends, without exposing other tenants.
+    if (!user.isPlatformAdmin) {
+      const now = new Date();
+      const { subscriptionStatus, trialEndsAt, subscriptionEndsAt } = user.organization;
+      const hasExpired = subscriptionStatus === 'expired' || subscriptionStatus === 'suspended'
+        || (subscriptionStatus === 'trial' && trialEndsAt !== null && trialEndsAt < now)
+        || (subscriptionStatus === 'active' && subscriptionEndsAt !== null && subscriptionEndsAt < now);
+      if (hasExpired) throw new UnauthorizedException('Clinic subscription is not active');
+    }
+
     // Check password
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatch) {
@@ -73,6 +87,7 @@ export class AuthService {
       organizationId: user.organizationId,
       role: user.role,
       permissions: Array.from(permissions),
+      isPlatformAdmin: user.isPlatformAdmin,
     };
 
     const accessToken = this.jwtService.sign(payload);

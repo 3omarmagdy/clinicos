@@ -18,6 +18,10 @@ model Organization {
   slug      String   @unique
   timezone  String   @default("UTC")
   currency  String   @default("EGP")
+  subscriptionPlan String @default("trial") // trial | clinic | center | enterprise
+  subscriptionStatus String @default("trial") // trial | active | suspended | expired
+  trialEndsAt DateTime?
+  subscriptionEndsAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -194,6 +198,7 @@ model User {
   lastName       String
   role           String    @default("receptionist") // owner | admin | doctor | receptionist | nurse | accountant | custom
   status         String    @default("active") // active | inactive | suspended
+  isPlatformAdmin Boolean  @default(false)
   lastLoginAt    DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt

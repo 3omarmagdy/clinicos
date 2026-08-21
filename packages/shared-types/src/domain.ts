@@ -10,6 +10,10 @@ export interface Organization {
   slug: string;
   timezone: string;
   currency: string;
+  subscriptionPlan: string;
+  subscriptionStatus: string;
+  trialEndsAt?: Date | null;
+  subscriptionEndsAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -139,6 +143,7 @@ export interface User {
     | 'accountant'
     | 'custom';
   status: 'active' | 'inactive' | 'suspended';
+  isPlatformAdmin: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

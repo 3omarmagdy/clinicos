@@ -19,6 +19,7 @@ export class UserService {
     lastName: string;
     role: string;
     status: string;
+    isPlatformAdmin: boolean;
     createdAt: Date;
     updatedAt: Date;
   }): User {
@@ -40,6 +41,7 @@ export class UserService {
         lastName: true,
         role: true,
         status: true,
+        isPlatformAdmin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -59,6 +61,7 @@ export class UserService {
         lastName: true,
         role: true,
         status: true,
+        isPlatformAdmin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -78,6 +81,7 @@ export class UserService {
         lastName: true,
         role: true,
         status: true,
+        isPlatformAdmin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -107,7 +111,7 @@ export class UserService {
         status: 'active',
         userRoles: { create: { roleId: role.id } },
       },
-      select: { id: true, organizationId: true, email: true, firstName: true, lastName: true, role: true, status: true, createdAt: true, updatedAt: true },
+      select: { id: true, organizationId: true, email: true, firstName: true, lastName: true, role: true, status: true, isPlatformAdmin: true, createdAt: true, updatedAt: true },
     });
     await this.audit.log({ organizationId, actorId, action: 'team_member.created', entityType: 'user', entityId: user.id, summary: `Created ${user.role} team member` });
     return this.toUser(user);

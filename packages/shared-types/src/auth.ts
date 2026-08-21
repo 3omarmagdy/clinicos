@@ -20,6 +20,7 @@ export interface JwtPayload {
   organizationId: string;
   role: string;
   permissions: string[];
+  isPlatformAdmin: boolean;
   iat?: number;
   exp?: number;
 }
@@ -30,4 +31,5 @@ export interface AuthContext {
   role: string;
   permissions: string[];
   email: string;
+  isPlatformAdmin: boolean;
 }

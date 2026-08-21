@@ -10,12 +10,14 @@ async function main() {
   // Create development organization
   const org = await prisma.organization.upsert({
     where: { slug: 'dev-clinic' },
-    update: {},
+    update: { subscriptionPlan: 'enterprise', subscriptionStatus: 'active' },
     create: {
       name: 'Development Clinic',
       slug: 'dev-clinic',
       timezone: 'Africa/Cairo',
       currency: 'EGP',
+      subscriptionPlan: 'enterprise',
+      subscriptionStatus: 'active',
     },
   });
 
@@ -175,7 +177,7 @@ async function main() {
 
   const ownerUser = await prisma.user.upsert({
     where: { organizationId_email: { organizationId: org.id, email: 'owner@dev.local' } },
-    update: {},
+    update: { isPlatformAdmin: true },
     create: {
       organizationId: org.id,
       email: 'owner@dev.local',
@@ -184,6 +186,7 @@ async function main() {
       lastName: 'Owner',
       role: 'owner',
       status: 'active',
+      isPlatformAdmin: true,
     },
   });
 
