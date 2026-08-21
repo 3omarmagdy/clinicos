@@ -40,3 +40,5 @@ prisma/.env
 # OS
 .DS_Store
 .env.local
+
+.pnpm-store
