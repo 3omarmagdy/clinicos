@@ -2,13 +2,14 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import type { User } from '@clinicos/shared-types';
 import type { CreateTeamMemberDto } from './user.dto';
+import { AuditService } from '../audit/audit.service';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const bcrypt = require('bcryptjs');
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private readonly audit: AuditService) {}
 
   private toUser(user: {
     id: string;
@@ -85,7 +86,7 @@ export class UserService {
     return users.map((user) => this.toUser(user));
   }
 
-  async createTeamMember(organizationId: string, data: CreateTeamMemberDto): Promise<User> {
+  async createTeamMember(organizationId: string, data: CreateTeamMemberDto, actorId?: string): Promise<User> {
     const email = data.email.trim().toLowerCase();
     const existing = await this.prisma.user.findFirst({ where: { organizationId, email }, select: { id: true } });
     if (existing) throw new ConflictException('A team member with this email already exists in this clinic');
@@ -108,6 +109,7 @@ export class UserService {
       },
       select: { id: true, organizationId: true, email: true, firstName: true, lastName: true, role: true, status: true, createdAt: true, updatedAt: true },
     });
+    await this.audit.log({ organizationId, actorId, action: 'team_member.created', entityType: 'user', entityId: user.id, summary: `Created ${user.role} team member` });
     return this.toUser(user);
   }
 }

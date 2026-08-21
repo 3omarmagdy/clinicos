@@ -35,6 +35,6 @@ export class OrganizationController {
     @Body() data: UpdateOrganizationDto,
     @Req() req: { user: AuthContext },
   ): Promise<Organization | null> {
-    return this.organizationService.updateOrganization(id, req.user.organizationId, data);
+    return this.organizationService.updateOrganization(id, req.user.organizationId, data, req.user.userId);
   }
 }

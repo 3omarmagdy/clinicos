@@ -18,5 +18,5 @@ export class AppointmentController {
   create(@Req() req: { user: AuthContext }, @Body() data: CreateAppointmentDto) { return this.appointments.create(req.user.organizationId, req.user.userId, data); }
 
   @Patch(':id/status') @RequirePermissions('appointment:update')
-  updateStatus(@Req() req: { user: AuthContext }, @Param('id') id: string, @Body() data: UpdateAppointmentStatusDto) { return this.appointments.updateStatus(id, req.user.organizationId, data); }
+  updateStatus(@Req() req: { user: AuthContext }, @Param('id') id: string, @Body() data: UpdateAppointmentStatusDto) { return this.appointments.updateStatus(id, req.user.organizationId, data, req.user.userId); }
 }

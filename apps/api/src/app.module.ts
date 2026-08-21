@@ -10,6 +10,7 @@ import { HealthModule } from './modules/health/health.module';
 import { PatientModule } from './modules/patient/patient.module';
 import { ClinicalRecordModule } from './modules/clinical-record/clinical-record.module';
 import { AppointmentModule } from './modules/appointment/appointment.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { AppointmentModule } from './modules/appointment/appointment.module';
     PatientModule,
     ClinicalRecordModule,
     AppointmentModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],

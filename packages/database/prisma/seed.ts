@@ -107,6 +107,7 @@ async function main() {
     // Organization permissions
     { code: 'organization:read', category: 'organization' },
     { code: 'organization:update', category: 'organization' },
+    { code: 'audit:read', category: 'audit' },
     // User permissions
     { code: 'user:create', category: 'user' },
     { code: 'user:read', category: 'user' },

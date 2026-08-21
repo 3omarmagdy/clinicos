@@ -27,6 +27,6 @@ export class UserController {
   @RequirePermissions('user:create')
   @Post()
   async create(@Body() data: CreateTeamMemberDto, @Req() req: { user: AuthContext }): Promise<User> {
-    return this.userService.createTeamMember(req.user.organizationId, data);
+    return this.userService.createTeamMember(req.user.organizationId, data, req.user.userId);
   }
 }

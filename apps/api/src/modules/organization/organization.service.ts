@@ -2,11 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Organization, CreateOrganizationDTO } from '@clinicos/shared-types';
 import type { UpdateOrganizationDto } from './organization.dto';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class OrganizationService {
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private readonly audit: AuditService) {}
 
   async getOrganization(id: string, organizationId: string): Promise<Organization | null> {
     if (id !== organizationId) {
@@ -24,13 +25,15 @@ export class OrganizationService {
     });
   }
 
-  async updateOrganization(id: string, organizationId: string, data: UpdateOrganizationDto): Promise<Organization | null> {
+  async updateOrganization(id: string, organizationId: string, data: UpdateOrganizationDto, actorId?: string): Promise<Organization | null> {
     if (id !== organizationId) return null;
 
-    return this.prisma.organization.update({
+    const organization = await this.prisma.organization.update({
       where: { id: organizationId },
       data: { name: data.name.trim(), timezone: data.timezone, currency: data.currency },
     });
+    await this.audit.log({ organizationId, actorId, action: 'organization.updated', entityType: 'organization', entityId: organizationId, summary: 'Updated clinic settings' });
+    return organization;
   }
 
   async dashboard(organizationId: string) {

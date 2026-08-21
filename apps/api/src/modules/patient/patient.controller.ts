@@ -22,7 +22,7 @@ export class PatientController {
 
   @Get('marketing-audience/export') @RequirePermissions('marketing:export')
   async exportAudience(@Req() req: { user: AuthContext }, @Query() query: MarketingAudienceQueryDto, @Res() response: Response) {
-    const patients = await this.patients.exportMarketingAudience(req.user.organizationId, query);
+    const patients = await this.patients.exportMarketingAudience(req.user.organizationId, query, req.user.userId);
     const escape = (value: string | Date | null) => `"${String(value ?? '').replaceAll('"', '""')}"`;
     const rows = patients.map((patient) => [patient.firstName, patient.lastName, patient.phone, patient.email, patient.gender, patient.city, patient.governorate, patient.dateOfBirth?.toISOString().slice(0, 10) ?? null, patient.leadSource, patient.marketingConsentAt?.toISOString() ?? null].map(escape).join(','));
     const csv = `\uFEFFfirst_name,last_name,phone,email,gender,city,governorate,date_of_birth,lead_source,marketing_consent_at\n${rows.join('\n')}`;
@@ -35,13 +35,13 @@ export class PatientController {
   get(@Param('id') id: string, @Req() req: { user: AuthContext }): Promise<Patient> { return this.patients.get(id, req.user.organizationId); }
 
   @Post() @RequirePermissions('patient:create')
-  create(@Body() data: CreatePatientDto, @Req() req: { user: AuthContext }): Promise<Patient> { return this.patients.create(req.user.organizationId, data); }
+  create(@Body() data: CreatePatientDto, @Req() req: { user: AuthContext }): Promise<Patient> { return this.patients.create(req.user.organizationId, data, req.user.userId); }
 
   @Post('import') @RequirePermissions('patient:create')
   import(@Body() data: ImportPatientsDto, @Req() req: { user: AuthContext }) {
-    return this.patients.import(req.user.organizationId, data.patients);
+    return this.patients.import(req.user.organizationId, data.patients, req.user.userId);
   }
 
   @Patch(':id') @RequirePermissions('patient:update')
-  update(@Param('id') id: string, @Body() data: UpdatePatientDto, @Req() req: { user: AuthContext }): Promise<Patient> { return this.patients.update(id, req.user.organizationId, data); }
+  update(@Param('id') id: string, @Body() data: UpdatePatientDto, @Req() req: { user: AuthContext }): Promise<Patient> { return this.patients.update(id, req.user.organizationId, data, req.user.userId); }
 }

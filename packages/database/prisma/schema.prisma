@@ -29,6 +29,7 @@ model Organization {
   patients        Patient[]
   clinicalRecords ClinicalRecord[]
   appointments    Appointment[]
+  auditLogs       AuditLog[]
 
   @@map("organizations")
 }
@@ -202,10 +203,32 @@ model User {
   userRoles               UserRole[]
   authoredClinicalRecords ClinicalRecord[] @relation("ClinicalRecordAuthor")
   createdAppointments     Appointment[]    @relation("AppointmentCreator")
+  auditLogs               AuditLog[]       @relation("AuditActor")
 
   @@unique([organizationId, email])
   @@index([organizationId, email])
   @@map("users")
+}
+
+// Immutable organization-scoped audit trail. Metadata must never contain
+// clinical notes, passwords, or full patient contact details.
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorId        String?
+  action         String
+  entityType     String
+  entityId       String?
+  summary        String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entityType, entityId])
+  @@map("audit_logs")
 }
 
 /// Role represents a set of permissions.

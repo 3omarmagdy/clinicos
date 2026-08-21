@@ -4,10 +4,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import type { Patient } from '@clinicos/shared-types';
 import type { CreatePatientDto, MarketingAudienceQueryDto, UpdatePatientDto } from './patient.dto';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class PatientService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
   private toPatient(patient: Omit<Patient, 'status'> & { status: string }): Patient {
     return { ...patient, status: patient.status as Patient['status'] };
@@ -54,7 +55,7 @@ export class PatientService {
 
   async create(
     organizationId: string,
-    data: CreatePatientDto,
+    data: CreatePatientDto, actorId?: string,
   ): Promise<Patient> {
     const {
       dateOfBirth,
@@ -87,6 +88,7 @@ export class PatientService {
         },
       });
 
+      await this.audit.log({ organizationId, actorId, action: 'patient.created', entityType: 'patient', entityId: patient.id, summary: `Created patient ${patient.medicalRecordNumber}` });
       return this.toPatient(patient);
     } catch (error: unknown) {
       if (
@@ -109,7 +111,7 @@ export class PatientService {
    * organization id, so one clinic can never see or de-duplicate another
    * clinic's contacts.
    */
-  async import(organizationId: string, patients: CreatePatientDto[]) {
+  async import(organizationId: string, patients: CreatePatientDto[], actorId?: string) {
     const phonesInFile = patients.map((patient) => patient.phone?.trim()).filter((phone): phone is string => Boolean(phone));
     const existing = new Set((await this.prisma.patient.findMany({
       where: { organizationId, phone: { in: phonesInFile } },
@@ -152,6 +154,7 @@ export class PatientService {
     }
 
     const result = records.length ? await this.prisma.patient.createMany({ data: records as never[] }) : { count: 0 };
+    await this.audit.log({ organizationId, actorId, action: 'patient.imported', entityType: 'patient_import', summary: `Imported ${result.count} patient records; skipped ${skippedRows.length}`, metadata: { created: result.count, skipped: skippedRows.length } });
     return { created: result.count, skipped: skippedRows.length, skippedRows };
   }
 
@@ -190,12 +193,14 @@ export class PatientService {
     return { total, samples };
   }
 
-  async exportMarketingAudience(organizationId: string, filters: MarketingAudienceQueryDto) {
-    return this.prisma.patient.findMany({
+  async exportMarketingAudience(organizationId: string, filters: MarketingAudienceQueryDto, actorId?: string) {
+    const audience = await this.prisma.patient.findMany({
       where: this.audienceWhere(organizationId, filters),
       orderBy: { createdAt: 'asc' },
       select: { firstName: true, lastName: true, phone: true, email: true, gender: true, city: true, governorate: true, dateOfBirth: true, leadSource: true, marketingConsentAt: true },
     });
+    await this.audit.log({ organizationId, actorId, action: 'marketing_audience.exported', entityType: 'marketing_audience', summary: `Exported ${audience.length} consented marketing contacts`, metadata: { count: audience.length } });
+    return audience;
   }
 
   private generateMedicalRecordNumber(): string {
@@ -205,7 +210,7 @@ export class PatientService {
   async update(
     id: string,
     organizationId: string,
-    data: UpdatePatientDto,
+    data: UpdatePatientDto, actorId?: string,
   ): Promise<Patient> {
     await this.get(id, organizationId);
 
@@ -245,6 +250,7 @@ export class PatientService {
         data: updateData,
       });
 
+      await this.audit.log({ organizationId, actorId, action: 'patient.updated', entityType: 'patient', entityId: patient.id, summary: `Updated patient ${patient.medicalRecordNumber}` });
       return this.toPatient(patient);
     } catch (error: unknown) {
       if (
