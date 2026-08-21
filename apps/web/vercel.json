@@ -1,0 +1,6 @@
+{
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm --filter @clinicos/shared-types build && pnpm --filter @clinicos/web build",
+  "outputDirectory": ".next"
+}
