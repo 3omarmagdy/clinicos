@@ -16,6 +16,13 @@ export function clearAccessToken(): void {
   window.localStorage.removeItem('token');
 }
 
+export function signOut(): void {
+  // Clinico stores only client-side session state in local storage. Clearing it
+  // all avoids stale sessions after a schema or permission update.
+  window.localStorage.clear();
+  window.location.replace('/login?loggedOut=1');
+}
+
 export async function authenticatedFetch(path: string, init: Parameters<typeof fetch>[1] = {}): Promise<Response> {
   const accessToken = getAccessToken();
   const headers = new Headers(init.headers);
