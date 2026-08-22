@@ -34,6 +34,7 @@ model Organization {
   clinicalRecords ClinicalRecord[]
   appointments    Appointment[]
   auditLogs       AuditLog[]
+  oauthLoginCodes OAuthLoginCode[]
 
   @@map("organizations")
 }
@@ -209,10 +210,31 @@ model User {
   authoredClinicalRecords ClinicalRecord[] @relation("ClinicalRecordAuthor")
   createdAppointments     Appointment[]    @relation("AppointmentCreator")
   auditLogs               AuditLog[]       @relation("AuditActor")
+  oauthLoginCodes         OAuthLoginCode[]
 
   @@unique([organizationId, email])
   @@index([organizationId, email])
   @@map("users")
+}
+
+/// A short-lived, single-use code issued after a successful external OAuth
+/// callback. It lets the browser obtain a normal Clinico session without
+/// exposing a JWT in the redirect URL.
+model OAuthLoginCode {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  codeHash       String   @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, expiresAt])
+  @@index([userId, expiresAt])
+  @@map("oauth_login_codes")
 }
 
 // Immutable organization-scoped audit trail. Metadata must never contain

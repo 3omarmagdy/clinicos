@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { setAccessToken } from '@/lib/auth-session';
 import { BrandMark } from '@/components/brand-mark';
@@ -13,6 +13,12 @@ export default function LoginPage() {
   const [organizationSlug, setOrganizationSlug] = useState('dev-clinic');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('googleError') === 'cancelled') setError('تم إلغاء تسجيل الدخول عبر Google.');
+    if (params.get('googleError') === 'failed') setError('تعذر تسجيل الدخول عبر Google. تأكد من رمز العيادة والبريد المدعو.');
+  }, []);
 
   const handleLogin = async () => {
     if (isPublicDemo) {
@@ -40,6 +46,14 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleLogin = () => {
+    if (!organizationSlug.trim()) {
+      setError('اكتب رمز العيادة أولًا لتسجيل الدخول بأمان.');
+      return;
+    }
+    window.location.href = `/api/v1/auth/google?organizationSlug=${encodeURIComponent(organizationSlug.trim())}`;
   };
 
   return (
@@ -95,6 +109,14 @@ export default function LoginPage() {
             className="w-full py-3 bg-teal-600 text-white rounded-lg font-bold hover:bg-teal-700 disabled:bg-slate-400 transition"
           >
             {isPublicDemo ? 'نسخة تعريفية' : loading ? 'جارٍ الدخول…' : 'دخول النظام'}
+          </button>
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={isPublicDemo}
+            className="w-full py-3 border border-slate-300 text-slate-800 rounded-lg font-bold hover:bg-slate-50 disabled:bg-slate-100 transition"
+          >
+            المتابعة باستخدام Google
           </button>
           <div className="flex justify-between text-sm"><Link href="/forgot-password" className="text-teal-700 hover:underline">نسيت كلمة المرور؟</Link><Link href="/register" className="text-teal-700 hover:underline">إنشاء عيادة جديدة</Link></div>
         </div>

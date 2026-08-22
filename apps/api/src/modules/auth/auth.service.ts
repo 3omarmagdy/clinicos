@@ -1,11 +1,24 @@
-import { ConflictException, Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthToken, LoginCredentials, JwtPayload } from '@clinicos/shared-types';
 import type { RegisterClinicDto } from './dto/register-clinic.dto';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const bcrypt = require('bcryptjs');
+
+type AuthorizedUser = {
+  id: string;
+  email: string;
+  organizationId: string;
+  role: string;
+  status: string;
+  isPlatformAdmin: boolean;
+  organization: { subscriptionStatus: string; trialEndsAt: Date | null; subscriptionEndsAt: Date | null };
+  userRoles: Array<{ role: { permissions: Array<{ permission: { code: string } }> } }>;
+};
 
 @Injectable()
 export class AuthService {
@@ -14,6 +27,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async login(credentials: LoginCredentials): Promise<AuthToken> {
@@ -50,21 +64,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (user.status !== 'active') {
-      this.logger.warn(`Login failed: user inactive - ${email}`);
-      throw new UnauthorizedException('User account is inactive');
-    }
-
-    // A platform owner can always enter the platform console. Clinic users are
-    // blocked when their trial/subscription ends, without exposing other tenants.
-    if (!user.isPlatformAdmin) {
-      const now = new Date();
-      const { subscriptionStatus, trialEndsAt, subscriptionEndsAt } = user.organization;
-      const hasExpired = subscriptionStatus === 'expired' || subscriptionStatus === 'suspended'
-        || (subscriptionStatus === 'trial' && trialEndsAt !== null && trialEndsAt < now)
-        || (subscriptionStatus === 'active' && subscriptionEndsAt !== null && subscriptionEndsAt < now);
-      if (hasExpired) throw new UnauthorizedException('Clinic subscription is not active');
-    }
+    this.assertUserCanSignIn(user);
 
     // Check password
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
@@ -73,7 +73,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Collect permissions from all roles
+    const token = this.issueToken(user);
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    this.logger.log(`User logged in: ${email}`);
+    return token;
+  }
+
+  private issueToken(user: AuthorizedUser): AuthToken {
+    // Collect permissions from all roles.
     const permissions = new Set<string>();
     for (const userRole of user.userRoles) {
       for (const rolePermission of userRole.role.permissions) {
@@ -91,14 +98,114 @@ export class AuthService {
       isPlatformAdmin: user.isPlatformAdmin,
     };
 
-    const accessToken = this.jwtService.sign(payload);
-
-    this.logger.log(`User logged in: ${email}`);
-
     return {
-      accessToken,
+      accessToken: this.jwtService.sign(payload),
       expiresIn: 15 * 60, // 15 minutes in seconds
     };
+  }
+
+  private assertUserCanSignIn(user: AuthorizedUser): void {
+    if (user.status !== 'active') throw new UnauthorizedException('User account is inactive');
+    if (user.isPlatformAdmin) return;
+
+    const now = new Date();
+    const { subscriptionStatus, trialEndsAt, subscriptionEndsAt } = user.organization;
+    const hasExpired = subscriptionStatus === 'expired' || subscriptionStatus === 'suspended'
+      || (subscriptionStatus === 'trial' && trialEndsAt !== null && trialEndsAt < now)
+      || (subscriptionStatus === 'active' && subscriptionEndsAt !== null && subscriptionEndsAt < now);
+    if (hasExpired) throw new UnauthorizedException('Clinic subscription is not active');
+  }
+
+  getFrontendLoginUrl(): string {
+    return `${this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000'}/login`;
+  }
+
+  getFrontendGoogleCallbackUrl(): string {
+    return `${this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000'}/auth/google/callback`;
+  }
+
+  private getGoogleConfig(): { clientId: string; clientSecret: string; redirectUri: string } {
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
+    const redirectUri = this.configService.get<string>('GOOGLE_REDIRECT_URI') || 'http://localhost:3001/api/v1/auth/google/callback';
+    if (!clientId || !clientSecret) throw new BadRequestException('Google sign-in is not configured');
+    return { clientId, clientSecret, redirectUri };
+  }
+
+  async createGoogleAuthorizationUrl(organizationSlug: string): Promise<string> {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(organizationSlug)) throw new BadRequestException('A valid clinic code is required');
+    const { clientId, redirectUri } = this.getGoogleConfig();
+    const state = this.jwtService.sign({ purpose: 'google-login', organizationSlug }, { expiresIn: '10m' });
+    const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    url.search = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      state,
+      prompt: 'select_account',
+    }).toString();
+    return url.toString();
+  }
+
+  async completeGoogleAuthorization(code: string, state: string): Promise<string> {
+    let organizationSlug: string;
+    try {
+      const decoded = this.jwtService.verify<{ purpose?: string; organizationSlug?: string }>(state);
+      if (decoded.purpose !== 'google-login' || !decoded.organizationSlug) throw new Error('Invalid state');
+      organizationSlug = decoded.organizationSlug;
+    } catch {
+      throw new UnauthorizedException('Google login session expired');
+    }
+
+    const { clientId, clientSecret, redirectUri } = this.getGoogleConfig();
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }),
+    });
+    if (!tokenResponse.ok) throw new UnauthorizedException('Google token exchange failed');
+    const tokenData = await tokenResponse.json() as { access_token?: string };
+    if (!tokenData.access_token) throw new UnauthorizedException('Google token missing');
+
+    const profileResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    if (!profileResponse.ok) throw new UnauthorizedException('Google profile lookup failed');
+    const profile = await profileResponse.json() as { email?: string; email_verified?: boolean };
+    if (!profile.email || profile.email_verified !== true) throw new UnauthorizedException('A verified Google email is required');
+
+    const user = await this.prisma.user.findFirst({
+      where: { email: profile.email.toLowerCase(), organization: { slug: organizationSlug } },
+      include: { organization: { select: { subscriptionStatus: true, trialEndsAt: true, subscriptionEndsAt: true } }, userRoles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
+    });
+    if (!user) throw new UnauthorizedException('No matching clinic account exists for this Google email');
+    this.assertUserCanSignIn(user);
+
+    const oneTimeCode = randomBytes(32).toString('base64url');
+    await this.prisma.oAuthLoginCode.create({
+      data: { organizationId: user.organizationId, userId: user.id, codeHash: this.hashCode(oneTimeCode), expiresAt: new Date(Date.now() + 60_000) },
+    });
+    return oneTimeCode;
+  }
+
+  async exchangeGoogleLoginCode(code: string): Promise<AuthToken> {
+    const codeHash = this.hashCode(code);
+    const record = await this.prisma.oAuthLoginCode.findUnique({
+      where: { codeHash },
+      include: { user: { include: { organization: { select: { subscriptionStatus: true, trialEndsAt: true, subscriptionEndsAt: true } }, userRoles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } } } },
+    });
+    if (!record || record.usedAt || record.expiresAt <= new Date()) throw new UnauthorizedException('Google login code expired');
+    const consumed = await this.prisma.oAuthLoginCode.updateMany({ where: { id: record.id, usedAt: null }, data: { usedAt: new Date() } });
+    if (consumed.count !== 1) throw new UnauthorizedException('Google login code already used');
+    this.assertUserCanSignIn(record.user);
+    await this.prisma.user.update({ where: { id: record.user.id }, data: { lastLoginAt: new Date() } });
+    this.logger.log(`User logged in with Google: ${record.user.email}`);
+    return this.issueToken(record.user);
+  }
+
+  private hashCode(code: string): string {
+    return createHash('sha256').update(code).digest('hex');
   }
 
   validateToken(token: string): JwtPayload {
