@@ -36,7 +36,9 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
-  const port = process.env.API_PORT || 3001;
+  // Cloud hosts such as Render provide their own PORT. Keep API_PORT for
+  // local Docker development, but always prefer the host-assigned port.
+  const port = process.env.PORT || process.env.API_PORT || 3001;
   const host = process.env.API_HOST || '0.0.0.0';
 
   await app.listen(port, host);

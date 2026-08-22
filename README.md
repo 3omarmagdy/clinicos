@@ -395,3 +395,18 @@ Proprietary - ClinicOS
 **Next:** Phase 02 - Authentication & Access Control
 
 **Last Updated:** August 2026
+# Deployment (safe production path)
+
+The Vercel project hosts the Next.js web application. The NestJS API and
+PostgreSQL database must be hosted separately for real clinic data.
+
+1. Create a PostgreSQL database and copy its SSL connection string.
+2. Deploy this repository to Render using `render.yaml`. Add `DATABASE_URL`
+   and set `FRONTEND_URL` to the final Vercel URL in Render's environment
+   variables.
+3. In Vercel set `NEXT_PUBLIC_API_URL` to the Render API URL, for example
+   `https://clinico-api.onrender.com`, then redeploy the web project.
+
+`render.yaml` is intentionally suitable for a free demo only. Before storing
+real patient data, use paid infrastructure with backups and a written privacy
+and data-retention policy.
