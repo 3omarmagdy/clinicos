@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState } from 'react';
 import { setAccessToken } from '@/lib/auth-session';
 import { BrandMark } from '@/components/brand-mark';
 
@@ -13,8 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleLogin = async () => {
     if (isPublicDemo) {
       setError('هذه نسخة تعريفية عامة ولا تحتوي على قاعدة بيانات مرضى. تواصل معنا لطلب تجربة خاصة وآمنة.');
       return;
@@ -45,7 +44,7 @@ export default function LoginPage() {
   return (
     <div dir="rtl" className="min-h-screen bg-slate-950 px-4 py-10 sm:py-16"><div className="mx-auto max-w-md"><BrandMark light /><div className="mt-10 rounded-2xl bg-white p-7 shadow-2xl sm:p-9"><h1 className="text-3xl font-bold text-slate-950">دخول آمن لمساحة عيادتك</h1><p className="mt-2 text-slate-600">بيانات كل مركز تبقى منفصلة عن أي مركز آخر.</p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
           {isPublicDemo && <div className="rounded-lg bg-sky-50 p-3 text-sm text-sky-900">نسخة تعريفية عامة: تسجيل الدخول وبيانات المرضى غير متاحين لحماية الخصوصية.</div>}
           {error && <div className="bg-red-50 text-red-700 p-3 rounded text-sm">{error}</div>}
 
@@ -89,13 +88,14 @@ export default function LoginPage() {
           </div>
 
           <button
-            type="submit"
+            type="button"
+            onClick={() => void handleLogin()}
             disabled={loading || isPublicDemo}
             className="w-full py-3 bg-teal-600 text-white rounded-lg font-bold hover:bg-teal-700 disabled:bg-slate-400 transition"
           >
             {isPublicDemo ? 'نسخة تعريفية' : loading ? 'جارٍ الدخول…' : 'دخول النظام'}
           </button>
-        </form>
+        </div>
 
         {isDevelopment && <div className="mt-6 p-4 bg-slate-50 rounded-lg text-sm text-slate-600">
           <p className="font-semibold mb-2 text-slate-800">بيانات بيئة التطوير:</p>
