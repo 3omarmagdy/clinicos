@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import type { LoginCredentials, AuthToken } from '@clinicos/shared-types';
+import { RegisterClinicDto } from './dto/register-clinic.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -21,5 +22,11 @@ export class AuthController {
     }
 
     return this.authService.login(credentials);
+  }
+
+  /** Creates an isolated clinic workspace and signs in its first owner. */
+  @Post('register-clinic')
+  async registerClinic(@Body() data: RegisterClinicDto): Promise<AuthToken & { organizationSlug: string }> {
+    return this.authService.registerClinic(data);
   }
 }
