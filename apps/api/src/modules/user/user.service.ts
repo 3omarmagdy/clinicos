@@ -116,4 +116,11 @@ export class UserService {
     await this.audit.log({ organizationId, actorId, action: 'team_member.created', entityType: 'user', entityId: user.id, summary: `Created ${user.role} team member` });
     return this.toUser(user);
   }
+
+  async setTeamMemberPassword(organizationId: string, userId: string, password: string, actorId?: string): Promise<void> {
+    const member = await this.prisma.user.findFirst({ where: { id: userId, organizationId }, select: { id: true, role: true } });
+    if (!member) throw new NotFoundException('Team member not found in this clinic');
+    await this.prisma.user.update({ where: { id: member.id }, data: { passwordHash: await bcrypt.hash(password, 12) } });
+    await this.audit.log({ organizationId, actorId, action: 'team_member.password_reset', entityType: 'user', entityId: member.id, summary: `Reset ${member.role} team member password` });
+  }
 }

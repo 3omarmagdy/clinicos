@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { setAccessToken } from '@/lib/auth-session';
 import { BrandMark } from '@/components/brand-mark';
 
@@ -95,6 +96,7 @@ export default function LoginPage() {
           >
             {isPublicDemo ? 'نسخة تعريفية' : loading ? 'جارٍ الدخول…' : 'دخول النظام'}
           </button>
+          <div className="flex justify-between text-sm"><Link href="/forgot-password" className="text-teal-700 hover:underline">نسيت كلمة المرور؟</Link><Link href="/register" className="text-teal-700 hover:underline">إنشاء عيادة جديدة</Link></div>
         </div>
 
         {isDevelopment && <div className="mt-6 p-4 bg-slate-50 rounded-lg text-sm text-slate-600">
