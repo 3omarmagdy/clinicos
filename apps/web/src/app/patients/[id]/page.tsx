@@ -30,7 +30,7 @@ interface Patient {
   updatedAt: string;
 }
 
-type ClinicalRecordCategory = 'clinical_note' | 'medical_history' | 'allergy' | 'chronic_condition' | 'medication' | 'follow_up';
+type ClinicalRecordCategory = 'clinical_note' | 'medical_history' | 'allergy' | 'chronic_condition' | 'medication' | 'follow_up' | 'prescription';
 
 interface ClinicalRecord {
   id: string;
@@ -59,6 +59,7 @@ const categoryLabels: Record<ClinicalRecordCategory, string> = {
   chronic_condition: 'Chronic condition',
   medication: 'Medication',
   follow_up: 'Follow-up',
+  prescription: 'Prescription',
 };
 
 function formatDate(value?: string | null): string {
@@ -146,7 +147,7 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
       <section className="mx-auto max-w-4xl rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/patients" className="text-sm font-medium text-sky-700 hover:underline">â† Patients</Link>
-          {patient && canUpdate && <Link href={`/patients/${patient.id}/edit`} className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-800">Edit patient</Link>}
+          <div className="flex gap-2">{patient && canCreateClinical && <Link href={`/patients/${patient.id}/prescription`} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800">وصفة إلكترونية</Link>}{patient && canUpdate && <Link href={`/patients/${patient.id}/edit`} className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-800">Edit patient</Link>}</div>
         </div>
 
         {loading ? <p className="mt-8 text-slate-600">Loading patientâ€¦</p> : error ? (

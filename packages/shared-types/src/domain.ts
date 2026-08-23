@@ -14,6 +14,11 @@ export interface Organization {
   subscriptionStatus: string;
   trialEndsAt?: Date | null;
   subscriptionEndsAt?: Date | null;
+  prescriptionHeader?: string | null;
+  prescriptionSubheader?: string | null;
+  prescriptionPhone?: string | null;
+  prescriptionAddress?: string | null;
+  prescriptionLogoUrl?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -110,7 +115,8 @@ export type ClinicalRecordCategory =
   | 'allergy'
   | 'chronic_condition'
   | 'medication'
-  | 'follow_up';
+  | 'follow_up'
+  | 'prescription';
 
 export interface ClinicalRecord {
   id: string;

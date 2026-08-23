@@ -30,7 +30,16 @@ export class OrganizationService {
 
     const organization = await this.prisma.organization.update({
       where: { id: organizationId },
-      data: { name: data.name.trim(), timezone: data.timezone, currency: data.currency },
+      data: {
+        name: data.name.trim(),
+        timezone: data.timezone,
+        currency: data.currency,
+        prescriptionHeader: data.prescriptionHeader?.trim() || null,
+        prescriptionSubheader: data.prescriptionSubheader?.trim() || null,
+        prescriptionPhone: data.prescriptionPhone?.trim() || null,
+        prescriptionAddress: data.prescriptionAddress?.trim() || null,
+        prescriptionLogoUrl: data.prescriptionLogoUrl?.trim() || null,
+      },
     });
     await this.audit.log({ organizationId, actorId, action: 'organization.updated', entityType: 'organization', entityId: organizationId, summary: 'Updated clinic settings' });
     return organization;

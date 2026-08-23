@@ -7,6 +7,7 @@ export const CLINICAL_RECORD_CATEGORIES = [
   'chronic_condition',
   'medication',
   'follow_up',
+  'prescription',
 ] as const;
 
 export type ClinicalRecordCategory = typeof CLINICAL_RECORD_CATEGORIES[number];
