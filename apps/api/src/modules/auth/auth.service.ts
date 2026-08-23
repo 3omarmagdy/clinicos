@@ -20,6 +20,15 @@ type AuthorizedUser = {
   userRoles: Array<{ role: { permissions: Array<{ permission: { code: string } }> } }>;
 };
 
+// Keep the OAuth response contract explicit. The API package intentionally
+// excludes the DOM library from its TypeScript config, so the ambient
+// `Response` type can resolve to Express' server response instead of the
+// fetch response returned by Node/Vercel.
+type OAuthFetchResponse = {
+  ok: boolean;
+  json(): Promise<unknown>;
+};
+
 @Injectable()
 export class AuthService {
   private logger = new Logger('AuthService');
@@ -159,18 +168,18 @@ export class AuthService {
     }
 
     const { clientId, clientSecret, redirectUri } = this.getGoogleConfig();
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    const tokenResponse = (await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }),
-    });
+    })) as unknown as OAuthFetchResponse;
     if (!tokenResponse.ok) throw new UnauthorizedException('Google token exchange failed');
     const tokenData = await tokenResponse.json() as { access_token?: string };
     if (!tokenData.access_token) throw new UnauthorizedException('Google token missing');
 
-    const profileResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+    const profileResponse = (await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
+    })) as unknown as OAuthFetchResponse;
     if (!profileResponse.ok) throw new UnauthorizedException('Google profile lookup failed');
     const profile = await profileResponse.json() as { email?: string; email_verified?: boolean };
     if (!profile.email || profile.email_verified !== true) throw new UnauthorizedException('A verified Google email is required');
