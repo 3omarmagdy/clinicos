@@ -25,3 +25,11 @@ services:
         generateValue: true
       - key: FRONTEND_URL
         sync: false
+      # Keep OAuth credentials in Render's secret manager only. They must
+      # never be committed to Git or copied into a browser-facing variable.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
