@@ -6,7 +6,6 @@ import { setAccessToken } from '@/lib/auth-session';
 import { BrandMark } from '@/components/brand-mark';
 
 export default function LoginPage() {
-  const isDevelopment = process.env.NODE_ENV !== 'production';
   const isPublicDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -69,7 +68,7 @@ export default function LoginPage() {
               type="text"
               value={organizationSlug}
               onChange={(e) => setOrganizationSlug(e.target.value)}
-              placeholder="dev-clinic"
+              placeholder="مثال: my-clinic"
               autoComplete="organization"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
@@ -82,7 +81,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="owner@dev.local"
+              placeholder="name@gmail.com"
               autoComplete="email"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
@@ -95,7 +94,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="dev_password_123"
+              placeholder="كلمة المرور"
               autoComplete="current-password"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
@@ -121,13 +120,6 @@ export default function LoginPage() {
           <div className="flex justify-between text-sm"><Link href="/forgot-password" className="text-teal-700 hover:underline">نسيت كلمة المرور؟</Link><Link href="/register" className="text-teal-700 hover:underline">إنشاء عيادة جديدة</Link></div>
         </div>
 
-        {isDevelopment && <div className="mt-6 p-4 bg-slate-50 rounded-lg text-sm text-slate-600">
-          <p className="font-semibold mb-2 text-slate-800">بيانات بيئة التطوير:</p>
-          <p>Owner: owner@dev.local</p>
-          <p>Doctor: doctor@dev.local</p>
-          <p>Receptionist: receptionist@dev.local</p>
-          <p className="mt-2">Password: dev_password_123</p>
-        </div>}
       </div></div></div>
   );
 }
