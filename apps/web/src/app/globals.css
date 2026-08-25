@@ -8,6 +8,14 @@ html {
 
 body {
   @apply bg-slate-50 text-slate-900;
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #99f6e4;
+  color: #042f2e;
 }
 
 :root {

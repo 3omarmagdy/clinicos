@@ -6,11 +6,11 @@ import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL('https://clinicos-crm.vercel.app'),
   title: {
-    default: 'Clinico | إدارة عيادتك بوضوح',
-    template: '%s | Clinico',
+    default: 'Clinicos | كل مريض يستحق فريقًا متصلًا',
+    template: '%s | Clinicos',
   },
   description:
-    'نظام عربي لإدارة العيادات: الاستقبال، المرضى، المواعيد، نقل بيانات CRM، الوصفات الإلكترونية والجمهور التسويقي القائم على الموافقة.',
+    'Clinicos هو نظام عربي لإدارة العيادات يجمع الاستقبال والطبيب والإدارة حول رحلة مريض واحدة، من التسجيل إلى المتابعة والوصفة الإلكترونية.',
   keywords: [
     'برنامج إدارة عيادة',
     'نظام إدارة عيادات',
@@ -23,14 +23,14 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'ar_EG',
     url: '/',
-    siteName: 'Clinico',
-    title: 'Clinico | إدارة عيادتك بوضوح',
-    description: 'من الاستقبال إلى المتابعة: تشغيل يومي منظّم لعيادتك في مساحة آمنة واحدة.',
+    siteName: 'Clinicos',
+    title: 'Clinicos | كل مريض يستحق فريقًا متصلًا',
+    description: 'من الاستقبال إلى المتابعة: مساحة عمل واحدة تجعل رعاية المريض أوضح لفريق العيادة.',
   },
   twitter: {
     card: 'summary',
-    title: 'Clinico | إدارة عيادتك بوضوح',
-    description: 'تشغيل يومي منظّم للعيادات والمراكز الطبية.',
+    title: 'Clinicos | كل مريض يستحق فريقًا متصلًا',
+    description: 'نظام عربي منظّم للعيادات والمراكز الطبية.',
   },
   robots: { index: true, follow: true },
 };
