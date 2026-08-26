@@ -12,6 +12,7 @@ import { ClinicalRecordModule } from './modules/clinical-record/clinical-record.
 import { AppointmentModule } from './modules/appointment/appointment.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     AppointmentModule,
     AuditModule,
     PlatformModule,
+    SubscriptionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

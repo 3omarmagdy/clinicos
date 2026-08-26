@@ -7,13 +7,14 @@ describe('AppointmentService', () => {
   const patient = { id: 'patient-a', firstName: 'Ada', lastName: 'Lovelace', medicalRecordNumber: 'MRN-001', phone: null };
   const doctor = { id: 'doctor-a', firstName: 'Grace', lastName: 'Hopper', email: 'grace@example.com' };
   const audit = { log: jest.fn().mockResolvedValue(undefined) };
+  const subscriptions = { assertCanWrite: jest.fn().mockResolvedValue(undefined), assertLimit: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(() => jest.clearAllMocks());
 
   it('creates an organization-scoped appointment without accepting a tenant id from the request', async () => {
     const create = jest.fn().mockResolvedValue({ id: 'appointment-a', patient });
     const prisma = { patient: { findFirst: jest.fn().mockResolvedValue(patient) }, appointment: { create } };
-    const service = new AppointmentService(prisma as never, audit as never);
+    const service = new AppointmentService(prisma as never, audit as never, subscriptions as never);
 
     await service.create(organizationId, actorId, { patientId: patient.id, scheduledAt: '2026-08-27T09:00:00.000Z' });
 
@@ -27,7 +28,7 @@ describe('AppointmentService', () => {
       patient: { findFirst: jest.fn().mockResolvedValue(patient) },
       user: { findFirst: jest.fn().mockResolvedValue(null) },
     };
-    const service = new AppointmentService(prisma as never, audit as never);
+    const service = new AppointmentService(prisma as never, audit as never, subscriptions as never);
 
     await expect(service.create(organizationId, actorId, { patientId: patient.id, doctorId: doctor.id, scheduledAt: '2026-08-27T09:00:00.000Z' })).rejects.toThrow('active doctor in this clinic');
   });
@@ -38,7 +39,7 @@ describe('AppointmentService', () => {
     const appointmentUpdate = jest.fn().mockResolvedValue({ ...appointment, status: 'checked_in' });
     const visitCreate = jest.fn().mockResolvedValue({ id: 'visit-a', patient, doctor, status: 'in_progress' });
     const prisma = { appointment: { findFirst: appointmentFindFirst, update: appointmentUpdate }, visit: { create: visitCreate } };
-    const service = new AppointmentService(prisma as never, audit as never);
+    const service = new AppointmentService(prisma as never, audit as never, subscriptions as never);
 
     const result = await service.checkIn(appointment.id, organizationId, actorId);
 
@@ -49,7 +50,7 @@ describe('AppointmentService', () => {
 
   it('does not expose an appointment from another organization', async () => {
     const findFirst = jest.fn().mockResolvedValue(null);
-    const service = new AppointmentService({ appointment: { findFirst } } as never, audit as never);
+    const service = new AppointmentService({ appointment: { findFirst } } as never, audit as never, subscriptions as never);
 
     await expect(service.updateStatus('appointment-other-org', organizationId, { status: 'confirmed' }, actorId)).rejects.toBeInstanceOf(NotFoundException);
     expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'appointment-other-org', organizationId } }));

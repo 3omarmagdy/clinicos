@@ -1,0 +1,106 @@
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import type { CreateManualPaymentDto, ReviewPaymentDto } from './subscription.dto';
+
+type LimitKey = 'users' | 'doctors' | 'patients' | 'appointments' | 'branches';
+type PlanName = 'FREE_TRIAL' | 'STARTER' | 'PROFESSIONAL' | 'CLINIC' | 'CENTER';
+
+export const PLAN_CATALOG: Record<PlanName, { label: string; priceEgp: number | null; limits: Record<LimitKey, number | null> }> = {
+  FREE_TRIAL: { label: 'تجربة مجانية', priceEgp: 0, limits: { users: 2, doctors: 1, patients: 50, appointments: 50, branches: 1 } },
+  STARTER: { label: 'Starter', priceEgp: 399, limits: { users: 2, doctors: 1, patients: 500, appointments: 300, branches: 1 } },
+  PROFESSIONAL: { label: 'Professional', priceEgp: 699, limits: { users: 5, doctors: 2, patients: 2000, appointments: null, branches: 1 } },
+  CLINIC: { label: 'Clinic', priceEgp: 999, limits: { users: 10, doctors: 5, patients: null, appointments: null, branches: 1 } },
+  CENTER: { label: 'Center', priceEgp: null, limits: { users: null, doctors: null, patients: null, appointments: null, branches: null } },
+};
+
+@Injectable()
+export class SubscriptionService {
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+
+  private legacyPlan(plan: string): PlanName {
+    const value = plan.toUpperCase();
+    if (value === 'TRIAL') return 'FREE_TRIAL';
+    if (value === 'ENTERPRISE') return 'CENTER';
+    return (value in PLAN_CATALOG ? value : 'FREE_TRIAL') as PlanName;
+  }
+
+  private async ensureCurrent(organizationId: string) {
+    const current = await this.prisma.subscription.findFirst({ where: { organizationId, isCurrent: true }, orderBy: { updatedAt: 'desc' } });
+    if (current) return current;
+    const organization = await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { subscriptionPlan: true, subscriptionStatus: true, trialEndsAt: true, subscriptionEndsAt: true } });
+    if (!organization) throw new NotFoundException('Clinic not found');
+    const plan = this.legacyPlan(organization.subscriptionPlan);
+    const status: 'ACTIVE' | 'EXPIRED' | 'TRIALING' = organization.subscriptionStatus === 'active' ? 'ACTIVE' : organization.subscriptionStatus === 'expired' ? 'EXPIRED' : 'TRIALING';
+    return this.prisma.subscription.create({ data: { organizationId, plan, status, trialStartedAt: plan === 'FREE_TRIAL' ? new Date() : null, trialEndsAt: plan === 'FREE_TRIAL' ? organization.trialEndsAt : null, currentPeriodEnd: plan === 'FREE_TRIAL' ? null : organization.subscriptionEndsAt } });
+  }
+
+  private async resolveStatus(organizationId: string) {
+    const subscription = await this.ensureCurrent(organizationId);
+    if (subscription.status === 'TRIALING' && subscription.trialEndsAt && subscription.trialEndsAt <= new Date()) {
+      const expired = await this.prisma.subscription.update({ where: { id: subscription.id }, data: { status: 'EXPIRED' } });
+      await this.prisma.organization.update({ where: { id: organizationId }, data: { subscriptionStatus: 'expired' } });
+      return expired;
+    }
+    if (subscription.status === 'ACTIVE' && subscription.currentPeriodEnd && subscription.currentPeriodEnd <= new Date()) return this.prisma.subscription.update({ where: { id: subscription.id }, data: { status: 'PAST_DUE' } });
+    return subscription;
+  }
+
+  async current(organizationId: string) {
+    const subscription = await this.resolveStatus(organizationId);
+    const catalog = PLAN_CATALOG[subscription.plan as PlanName];
+    const now = new Date(); const monthStart = new Date(now.getFullYear(), now.getMonth(), 1); const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const [users, doctors, patients, appointments, branches] = await Promise.all([
+      this.prisma.user.count({ where: { organizationId, status: 'active' } }),
+      this.prisma.user.count({ where: { organizationId, status: 'active', role: 'doctor' } }),
+      this.prisma.patient.count({ where: { organizationId } }),
+      this.prisma.appointment.count({ where: { organizationId, scheduledAt: { gte: monthStart, lt: nextMonth } } }),
+      this.prisma.location.count({ where: { organizationId, status: 'active' } }),
+    ]);
+    return { ...subscription, catalog, limits: catalog.limits, usage: { users, doctors, patients, appointments, branches }, readOnly: ['EXPIRED', 'PAST_DUE', 'CANCELED'].includes(subscription.status), remainingTrialDays: subscription.trialEndsAt ? Math.max(0, Math.ceil((subscription.trialEndsAt.getTime() - Date.now()) / 86_400_000)) : null };
+  }
+
+  async assertCanWrite(organizationId: string): Promise<void> {
+    const subscription = await this.resolveStatus(organizationId);
+    if (['EXPIRED', 'PAST_DUE', 'CANCELED'].includes(subscription.status)) throw new ForbiddenException('Your trial or subscription has ended. You can still view your data, but new changes require an active plan.');
+  }
+
+  async assertLimit(organizationId: string, key: LimitKey, additional = 1): Promise<void> {
+    await this.assertCanWrite(organizationId);
+    const subscription = await this.resolveStatus(organizationId);
+    const maximum = PLAN_CATALOG[subscription.plan as PlanName].limits[key];
+    if (maximum === null) return;
+    const now = new Date(); const monthStart = new Date(now.getFullYear(), now.getMonth(), 1); const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const current = key === 'users' ? await this.prisma.user.count({ where: { organizationId, status: 'active' } }) : key === 'doctors' ? await this.prisma.user.count({ where: { organizationId, status: 'active', role: 'doctor' } }) : key === 'patients' ? await this.prisma.patient.count({ where: { organizationId } }) : key === 'appointments' ? await this.prisma.appointment.count({ where: { organizationId, scheduledAt: { gte: monthStart, lt: nextMonth } } }) : await this.prisma.location.count({ where: { organizationId, status: 'active' } });
+    if (current + additional > maximum) throw new ConflictException(`Plan limit reached for ${key}. Upgrade the subscription to continue.`);
+  }
+
+  async requestPayment(organizationId: string, data: CreateManualPaymentDto, actorId: string) {
+    const current = await this.resolveStatus(organizationId); const plan = data.plan as PlanName; const amount = PLAN_CATALOG[plan].priceEgp;
+    if (amount === null) throw new ConflictException('Center plans are arranged with the Clinicos team.');
+    const reference = data.reference.trim(); const existing = await this.prisma.payment.findFirst({ where: { organizationId, reference, status: 'PENDING' } });
+    if (existing) throw new ConflictException('A pending request already uses this payment reference.');
+    const payment = await this.prisma.payment.create({ data: { organizationId, subscriptionId: current.id, amount, reference, paymentMethod: data.paymentMethod?.trim() || 'manual_transfer' } });
+    await this.prisma.subscriptionEvent.create({ data: { organizationId, subscriptionId: current.id, actorId, action: 'payment.requested', summary: `Manual payment request for ${plan}`, metadata: { paymentId: payment.id, plan, amount } } });
+    await this.audit.log({ organizationId, actorId, action: 'subscription.payment_requested', entityType: 'payment', entityId: payment.id, summary: `Requested manual payment for ${plan}` });
+    return payment;
+  }
+
+  async listPayments(organizationId: string) { return this.prisma.payment.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, select: { id: true, amount: true, currency: true, paymentMethod: true, reference: true, status: true, rejectionReason: true, createdAt: true, reviewedAt: true } }); }
+  async listPendingPayments() { return this.prisma.payment.findMany({ where: { status: 'PENDING' }, orderBy: { createdAt: 'asc' }, include: { organization: { select: { id: true, name: true, slug: true } }, subscription: { select: { plan: true, status: true } } } }); }
+
+  async reviewPayment(paymentId: string, data: ReviewPaymentDto, actorId: string) {
+    const payment = await this.prisma.payment.findUnique({ where: { id: paymentId }, include: { subscription: true } });
+    if (!payment) throw new NotFoundException('Payment request not found');
+    if (payment.status !== 'PENDING') throw new ConflictException('This payment request has already been reviewed');
+    if (data.action === 'reject') {
+      const rejected = await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'REJECTED', reviewedById: actorId, reviewedAt: new Date(), rejectionReason: data.rejectionReason?.trim() || 'Payment could not be verified' } });
+      await this.prisma.subscriptionEvent.create({ data: { organizationId: payment.organizationId, subscriptionId: payment.subscriptionId, actorId, action: 'payment.rejected', summary: 'Manual payment request rejected' } }); return rejected;
+    }
+    const plan = this.planForAmount(payment.amount); const now = new Date(); const end = new Date(now); end.setMonth(end.getMonth() + 1);
+    const [approved] = await this.prisma.$transaction([this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'PAID', paidAt: now, reviewedById: actorId, reviewedAt: now } }), this.prisma.subscription.update({ where: { id: payment.subscriptionId }, data: { plan, status: 'ACTIVE', trialEndsAt: null, currentPeriodStart: now, currentPeriodEnd: end, canceledAt: null } }), this.prisma.organization.update({ where: { id: payment.organizationId }, data: { subscriptionPlan: plan.toLowerCase(), subscriptionStatus: 'active', trialEndsAt: null, subscriptionEndsAt: end } }), this.prisma.subscriptionEvent.create({ data: { organizationId: payment.organizationId, subscriptionId: payment.subscriptionId, actorId, action: 'subscription.activated', summary: `${plan} plan activated after payment approval` } })]);
+    await this.audit.log({ organizationId: payment.organizationId, actorId, action: 'subscription.activated', entityType: 'payment', entityId: payment.id, summary: `${plan} plan payment approved` }); return approved;
+  }
+
+  private planForAmount(amount: number): PlanName { return (Object.entries(PLAN_CATALOG).find(([, value]) => value.priceEgp === amount)?.[0] || 'STARTER') as PlanName; }
+}
