@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import type { AppointmentQueryDto, CreateAppointmentDto, RescheduleAppointmentDto, UpdateAppointmentStatusDto, UpdateVisitDto } from './appointment.dto';
 import { AuditService } from '../audit/audit.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 const patientSelect = { id: true, firstName: true, lastName: true, medicalRecordNumber: true, phone: true } as const;
 const doctorSelect = { id: true, firstName: true, lastName: true, email: true } as const;
@@ -9,21 +10,16 @@ const unavailableAppointmentStatuses = ['cancelled', 'no_show'];
 
 @Injectable()
 export class AppointmentService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly subscriptions: SubscriptionService) {}
 
   async listDoctors(organizationId: string) {
-    return this.prisma.user.findMany({
-      where: { organizationId, role: 'doctor', status: 'active' },
-      select: doctorSelect,
-      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
-    });
+    return this.prisma.user.findMany({ where: { organizationId, role: 'doctor', status: 'active' }, select: doctorSelect, orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }] });
   }
 
   async list(organizationId: string, query: AppointmentQueryDto) {
     const today = new Date();
     const start = query.from ? new Date(query.from) : new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const end = query.to ? new Date(query.to) : new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
-
     return this.prisma.appointment.findMany({
       where: { organizationId, scheduledAt: { gte: start, lt: end }, ...(query.doctorId ? { doctorId: query.doctorId } : {}) },
       include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, visit: true },
@@ -55,13 +51,13 @@ export class AppointmentService {
   }
 
   async create(organizationId: string, createdById: string, data: CreateAppointmentDto) {
+    await this.subscriptions.assertLimit(organizationId, 'appointments');
     const patient = await this.prisma.patient.findFirst({ where: { id: data.patientId, organizationId }, select: { id: true } });
     if (!patient) throw new NotFoundException('Patient not found');
     await this.assertDoctor(organizationId, data.doctorId);
     const scheduledAt = new Date(data.scheduledAt);
     const durationMinutes = data.durationMinutes ?? 30;
     await this.assertNoConflict(organizationId, data.doctorId, scheduledAt, durationMinutes);
-
     const appointment = await this.prisma.appointment.create({
       data: { organizationId, createdById, patientId: data.patientId, doctorId: data.doctorId, scheduledAt, durationMinutes, reason: data.reason?.trim(), notes: data.notes?.trim() },
       include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, visit: true },
@@ -71,6 +67,7 @@ export class AppointmentService {
   }
 
   async reschedule(id: string, organizationId: string, data: RescheduleAppointmentDto, actorId: string) {
+    await this.subscriptions.assertCanWrite(organizationId);
     const existing = await this.prisma.appointment.findFirst({ where: { id, organizationId }, select: { id: true, status: true, doctorId: true, durationMinutes: true } });
     if (!existing) throw new NotFoundException('Appointment not found');
     if (['checked_in', 'completed', 'cancelled', 'no_show'].includes(existing.status)) throw new BadRequestException('This appointment can no longer be rescheduled');
@@ -80,14 +77,14 @@ export class AppointmentService {
     const durationMinutes = data.durationMinutes ?? existing.durationMinutes;
     await this.assertNoConflict(organizationId, nextDoctorId ?? undefined, scheduledAt, durationMinutes, id);
     const appointment = await this.prisma.appointment.update({ where: { id }, data: { scheduledAt, durationMinutes, doctorId: nextDoctorId }, include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, visit: true } });
-    await this.audit.log({ organizationId, actorId, action: 'appointment.rescheduled', entityType: 'appointment', entityId: id, summary: 'Rescheduled appointment', metadata: { doctorAssigned: Boolean(data.doctorId) } });
+    await this.audit.log({ organizationId, actorId, action: 'appointment.rescheduled', entityType: 'appointment', entityId: id, summary: 'Rescheduled appointment', metadata: { doctorAssigned: Boolean(nextDoctorId) } });
     return appointment;
   }
 
   async updateStatus(id: string, organizationId: string, data: UpdateAppointmentStatusDto, actorId?: string) {
+    await this.subscriptions.assertCanWrite(organizationId);
     const existing = await this.prisma.appointment.findFirst({ where: { id, organizationId }, include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, visit: true } });
     if (!existing) throw new NotFoundException('Appointment not found');
-
     if (data.status === 'checked_in') return this.checkIn(id, organizationId, actorId ?? existing.createdById);
     if (existing.visit && (data.status === 'completed' || data.status === 'cancelled')) {
       await this.updateVisit(id, organizationId, actorId ?? existing.createdById, { status: data.status === 'completed' ? 'completed' : 'cancelled' });
@@ -99,11 +96,11 @@ export class AppointmentService {
   }
 
   async checkIn(id: string, organizationId: string, actorId: string) {
+    await this.subscriptions.assertCanWrite(organizationId);
     const existing = await this.prisma.appointment.findFirst({ where: { id, organizationId }, include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, visit: true } });
     if (!existing) throw new NotFoundException('Appointment not found');
     if (existing.visit) return existing;
     if (['completed', 'cancelled', 'no_show'].includes(existing.status)) throw new BadRequestException('This appointment cannot be checked in');
-
     const appointment = await this.prisma.appointment.update({ where: { id }, data: { status: 'checked_in' }, include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, visit: true } });
     const visit = await this.prisma.visit.create({ data: { organizationId, appointmentId: id, patientId: existing.patientId, doctorId: existing.doctorId, createdById: actorId }, include: { patient: { select: patientSelect }, doctor: { select: doctorSelect } } });
     await this.audit.log({ organizationId, actorId, action: 'visit.started', entityType: 'visit', entityId: visit.id, summary: 'Started patient visit' });
@@ -117,6 +114,7 @@ export class AppointmentService {
   }
 
   async updateVisit(appointmentId: string, organizationId: string, actorId: string, data: UpdateVisitDto) {
+    await this.subscriptions.assertCanWrite(organizationId);
     const visit = await this.prisma.visit.findFirst({ where: { appointmentId, organizationId }, select: { id: true, status: true } });
     if (!visit) throw new NotFoundException('Visit not found');
     const status = data.status ?? visit.status;

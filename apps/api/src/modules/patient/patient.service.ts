@@ -5,10 +5,11 @@ import type { Prisma } from '@prisma/client';
 import type { Patient } from '@clinicos/shared-types';
 import type { CreatePatientDto, MarketingAudienceQueryDto, UpdatePatientDto } from './patient.dto';
 import { AuditService } from '../audit/audit.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()
 export class PatientService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly subscriptions: SubscriptionService) {}
 
   private toPatient(patient: Omit<Patient, 'status'> & { status: string }): Patient {
     return { ...patient, status: patient.status as Patient['status'] };
@@ -57,6 +58,7 @@ export class PatientService {
     organizationId: string,
     data: CreatePatientDto, actorId?: string,
   ): Promise<Patient> {
+    await this.subscriptions.assertLimit(organizationId, 'patients');
     const {
       dateOfBirth,
       admittedAt,
@@ -153,6 +155,7 @@ export class PatientService {
       });
     }
 
+    if (records.length) await this.subscriptions.assertLimit(organizationId, 'patients', records.length);
     const result = records.length ? await this.prisma.patient.createMany({ data: records as never[] }) : { count: 0 };
     await this.audit.log({ organizationId, actorId, action: 'patient.imported', entityType: 'patient_import', summary: `Imported ${result.count} patient records; skipped ${skippedRows.length}`, metadata: { created: result.count, skipped: skippedRows.length } });
     return { created: result.count, skipped: skippedRows.length, skippedRows };
@@ -212,6 +215,7 @@ export class PatientService {
     organizationId: string,
     data: UpdatePatientDto, actorId?: string,
   ): Promise<Patient> {
+    await this.subscriptions.assertCanWrite(organizationId);
     await this.get(id, organizationId);
 
     try {

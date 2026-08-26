@@ -1,12 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateClinicalRecordDto, UpdateClinicalRecordDto } from './clinical-record.dto';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 const authorSelect = { id: true, firstName: true, lastName: true } as const;
 
 @Injectable()
 export class ClinicalRecordService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly subscriptions: SubscriptionService) {}
 
   private async assertPatientInOrganization(patientId: string, organizationId: string): Promise<void> {
     const patient = await this.prisma.patient.findFirst({ where: { id: patientId, organizationId }, select: { id: true } });
@@ -32,6 +33,7 @@ export class ClinicalRecordService {
   }
 
   async create(patientId: string, organizationId: string, authorId: string, data: CreateClinicalRecordDto) {
+    await this.subscriptions.assertCanWrite(organizationId);
     await this.assertPatientInOrganization(patientId, organizationId);
     return this.prisma.clinicalRecord.create({
       data: { ...data, patientId, organizationId, authorId },
@@ -40,6 +42,7 @@ export class ClinicalRecordService {
   }
 
   async update(patientId: string, recordId: string, organizationId: string, data: UpdateClinicalRecordDto) {
+    await this.subscriptions.assertCanWrite(organizationId);
     await this.get(patientId, recordId, organizationId);
     return this.prisma.clinicalRecord.update({
       where: { id: recordId },

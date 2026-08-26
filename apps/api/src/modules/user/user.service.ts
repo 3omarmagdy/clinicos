@@ -3,13 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { User } from '@clinicos/shared-types';
 import type { CreateTeamMemberDto } from './user.dto';
 import { AuditService } from '../audit/audit.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const bcrypt = require('bcryptjs');
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private prisma: PrismaService, private readonly audit: AuditService, private readonly subscriptions: SubscriptionService) {}
 
   private toUser(user: {
     id: string;
@@ -91,6 +92,8 @@ export class UserService {
   }
 
   async createTeamMember(organizationId: string, data: CreateTeamMemberDto, actorId?: string): Promise<User> {
+    await this.subscriptions.assertLimit(organizationId, 'users');
+    if (data.role === 'doctor') await this.subscriptions.assertLimit(organizationId, 'doctors');
     const email = data.email.trim().toLowerCase();
     const existing = await this.prisma.user.findFirst({ where: { organizationId, email }, select: { id: true } });
     if (existing) throw new ConflictException('A team member with this email already exists in this clinic');
@@ -118,6 +121,7 @@ export class UserService {
   }
 
   async setTeamMemberPassword(organizationId: string, userId: string, password: string, actorId?: string): Promise<void> {
+    await this.subscriptions.assertCanWrite(organizationId);
     const member = await this.prisma.user.findFirst({ where: { id: userId, organizationId }, select: { id: true, role: true } });
     if (!member) throw new NotFoundException('Team member not found in this clinic');
     await this.prisma.user.update({ where: { id: member.id }, data: { passwordHash: await bcrypt.hash(password, 12) } });
