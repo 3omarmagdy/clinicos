@@ -133,6 +133,45 @@ export interface ClinicalRecord {
   author?: Pick<User, 'id' | 'firstName' | 'lastName'>;
 }
 
+// Appointments and visits
+export type AppointmentStatus = 'scheduled' | 'confirmed' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
+export type VisitStatus = 'in_progress' | 'completed' | 'cancelled';
+
+export interface Appointment {
+  id: string;
+  organizationId: string;
+  patientId: string;
+  createdById: string;
+  doctorId?: string | null;
+  scheduledAt: Date;
+  durationMinutes: number;
+  status: AppointmentStatus;
+  reason?: string | null;
+  notes?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  patient?: Pick<Patient, 'id' | 'firstName' | 'lastName' | 'medicalRecordNumber' | 'phone'>;
+  doctor?: Pick<User, 'id' | 'firstName' | 'lastName' | 'email'> | null;
+  visit?: Visit | null;
+}
+
+export interface Visit {
+  id: string;
+  organizationId: string;
+  appointmentId: string;
+  patientId: string;
+  doctorId?: string | null;
+  createdById: string;
+  status: VisitStatus;
+  startedAt: Date;
+  completedAt?: Date | null;
+  notes?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  patient?: Pick<Patient, 'id' | 'firstName' | 'lastName' | 'medicalRecordNumber' | 'phone'>;
+  doctor?: Pick<User, 'id' | 'firstName' | 'lastName' | 'email'> | null;
+}
+
 // User
 export interface User {
   id: string;
