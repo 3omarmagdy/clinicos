@@ -126,13 +126,14 @@ export default function PatientsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10">
-      <section className="mx-auto max-w-5xl rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">
-        <div className="flex flex-wrap gap-4 text-sm font-medium text-sky-700"><Link href="/dashboard" className="hover:underline">← Dashboard</Link><Link href="/patients/import" className="hover:underline">Import existing patients →</Link></div>
+    <main dir="rtl" className="min-h-screen bg-[#f5f9fd] px-4 py-6 text-[#10233d] sm:py-10">
+      <section className="mx-auto max-w-6xl rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#dce7f1] sm:p-8">
+        <div className="flex flex-wrap gap-4 text-sm font-bold text-[#1768a8]"><Link href="/dashboard" className="hover:underline">العودة إلى Workspace ←</Link><Link href="/patients/import" className="hover:underline">CRM Import · استيراد بيانات سابقة</Link></div>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Admissions</h1>
-            <p className="mt-1 text-slate-600">Patient intake and consent-based clinic CRM.</p>
+            <p className="text-xs font-extrabold tracking-[.14em] text-[#087d78]">PATIENT MANAGEMENT</p>
+            <h1 className="mt-1 text-3xl font-extrabold text-[#10233d]">Patient Registry · سجل المرضى</h1>
+            <p className="mt-2 text-slate-600">تسجيل مرضى، Patient Profile، وبيانات تسويقية تعتمد على موافقة موثقة.</p>
           </div>
           <p className="text-sm text-slate-500">{patients.length} result{patients.length === 1 ? '' : 's'}</p>
         </div>
@@ -141,11 +142,11 @@ export default function PatientsPage() {
 
         <div className="mt-6">
           <label htmlFor="patient-search" className="sr-only">Search patients</label>
-          <input id="patient-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name, MRN, or phone" className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-100" />
+          <input id="patient-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث بالاسم أو MRN أو رقم الهاتف" className="field" />
         </div>
 
-        <form onSubmit={create} className="mt-4 grid gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-2">
-          <h2 className="sm:col-span-2 text-lg font-semibold text-slate-900">New admission</h2>
+        <form onSubmit={create} className="mt-5 grid gap-4 rounded-2xl border border-[#dce7f1] bg-[#fbfdff] p-5 sm:grid-cols-2">
+          <div className="sm:col-span-2"><p className="text-xs font-extrabold tracking-[.14em] text-[#1768a8]">NEW PATIENT</p><h2 className="mt-1 text-xl font-extrabold text-[#173b63]">تسجيل مريض جديد</h2></div>
           <label className="grid gap-1 text-sm font-medium text-slate-700">First name<input required name="firstName" value={formValues.firstName} onChange={(event) => setFormValues((current) => ({ ...current, firstName: event.target.value }))} className="rounded border p-2 font-normal" /></label>
           <label className="grid gap-1 text-sm font-medium text-slate-700">Last name<input required name="lastName" value={formValues.lastName} onChange={(event) => setFormValues((current) => ({ ...current, lastName: event.target.value }))} className="rounded border p-2 font-normal" /></label>
           <label className="grid gap-1 text-sm font-medium text-slate-700">Phone<input required name="phone" value={formValues.phone} onChange={(event) => setFormValues((current) => ({ ...current, phone: event.target.value }))} maxLength={30} className="rounded border p-2 font-normal" /></label>
@@ -159,8 +160,8 @@ export default function PatientsPage() {
           <label className="grid gap-1 text-sm font-medium text-slate-700 sm:col-span-2">Lead source<input name="leadSource" value={formValues.leadSource} onChange={(event) => setFormValues((current) => ({ ...current, leadSource: event.target.value }))} maxLength={120} placeholder="e.g. Facebook Ads, referral, walk-in" className="rounded border p-2 font-normal" /></label>
           <label className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 sm:col-span-2"><input name="marketingConsent" type="checkbox" checked={formValues.marketingConsent} onChange={(event) => setFormValues((current) => ({ ...current, marketingConsent: event.target.checked }))} className="mt-1" /><span>Patient has explicitly consented to receive marketing communications and to the permitted use of their contact data for advertising audiences.</span></label>
           <p className="text-sm text-slate-600 sm:col-span-2">A medical record number is generated automatically. Only consented contacts should ever be included in marketing exports.</p>
-          <button disabled={saving} className="w-fit rounded bg-sky-700 px-4 py-2 font-medium text-white hover:bg-sky-800 disabled:opacity-60">
-            {saving ? 'Saving…' : 'Add patient'}
+          <button disabled={saving} className="w-fit rounded-xl bg-[#1768a8] px-5 py-3 font-extrabold text-white hover:bg-[#11598f] disabled:opacity-60">
+            {saving ? 'جارٍ حفظ Patient Profile…' : 'حفظ بيانات المريض'}
           </button>
         </form>
 

@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { Cairo } from 'next/font/google';
 import { Providers } from '@/components/providers';
 import './globals.css';
+
+const cairo = Cairo({ subsets: ['arabic', 'latin'], display: 'swap', variable: '--font-clinicos' });
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://clinicos-crm.vercel.app'),
@@ -44,7 +47,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ar" dir="rtl">
-      <body>
+      <body className={cairo.variable}>
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { setAccessToken } from '@/lib/auth-session';
 import { BrandMark } from '@/components/brand-mark';
@@ -13,113 +14,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('googleError') === 'cancelled') setError('تم إلغاء تسجيل الدخول عبر Google.');
-    if (params.get('googleError') === 'failed') setError('تعذر تسجيل الدخول عبر Google. تأكد من رمز العيادة والبريد المدعو.');
-  }, []);
-
-  const handleLogin = async () => {
-    if (isPublicDemo) {
-      setError('هذه نسخة تعريفية عامة ولا تحتوي على قاعدة بيانات مرضى. تواصل معنا لطلب تجربة خاصة وآمنة.');
-      return;
-    }
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, organizationSlug }),
-      });
-
-      if (!response.ok) throw new Error('Invalid email, password, or clinic code');
-
-      const data = await response.json();
-      setAccessToken(data.accessToken);
-      window.location.href = '/dashboard';
-    } catch (err: unknown) {
-      const error = err instanceof Error ? err.message : 'Login failed';
-      setError(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = () => {
-    if (!organizationSlug.trim()) {
-      setError('اكتب رمز العيادة أولًا لتسجيل الدخول بأمان.');
-      return;
-    }
-    window.location.href = `/api/v1/auth/google?organizationSlug=${encodeURIComponent(organizationSlug.trim())}`;
-  };
-
-  return (
-    <div dir="rtl" className="min-h-screen bg-slate-950 px-4 py-10 sm:py-16"><div className="mx-auto max-w-md"><BrandMark light /><div className="mt-10 rounded-2xl bg-white p-7 shadow-2xl sm:p-9"><h1 className="text-3xl font-bold text-slate-950">دخول آمن لمساحة عيادتك</h1><p className="mt-2 text-slate-600">بيانات كل مركز تبقى منفصلة عن أي مركز آخر.</p>
-
-        <div className="space-y-4">
-          {isPublicDemo && <div className="rounded-lg bg-sky-50 p-3 text-sm text-sky-900">نسخة تعريفية عامة: تسجيل الدخول وبيانات المرضى غير متاحين لحماية الخصوصية.</div>}
-          {error && <div className="bg-red-50 text-red-700 p-3 rounded text-sm">{error}</div>}
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">رمز العيادة</label>
-            <input
-              type="text"
-              value={organizationSlug}
-              onChange={(e) => setOrganizationSlug(e.target.value)}
-              placeholder="مثال: my-clinic"
-              autoComplete="organization"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">البريد الإلكتروني</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@gmail.com"
-              autoComplete="email"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">كلمة المرور</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="كلمة المرور"
-              autoComplete="current-password"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => void handleLogin()}
-            disabled={loading || isPublicDemo}
-            className="w-full py-3 bg-teal-600 text-white rounded-lg font-bold hover:bg-teal-700 disabled:bg-slate-400 transition"
-          >
-            {isPublicDemo ? 'نسخة تعريفية' : loading ? 'جارٍ الدخول…' : 'دخول النظام'}
-          </button>
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={isPublicDemo}
-            className="w-full py-3 border border-slate-300 text-slate-800 rounded-lg font-bold hover:bg-slate-50 disabled:bg-slate-100 transition"
-          >
-            المتابعة باستخدام Google
-          </button>
-          <div className="flex justify-between text-sm"><Link href="/forgot-password" className="text-teal-700 hover:underline">نسيت كلمة المرور؟</Link><Link href="/register" className="text-teal-700 hover:underline">إنشاء عيادة جديدة</Link></div>
-        </div>
-
-      </div></div></div>
-  );
+  useEffect(() => { const params = new URLSearchParams(window.location.search); if (params.get('googleError') === 'cancelled') setError('تم إلغاء تسجيل الدخول عبر Google.'); if (params.get('googleError') === 'failed') setError('تعذر تسجيل الدخول عبر Google. تأكد من رمز العيادة والبريد المدعو.'); }, []);
+  const handleLogin = async () => { if (isPublicDemo) { setError('هذه نسخة تعريفية عامة ولا تحتوي على بيانات مرضى. اطلب تجربة خاصة وآمنة لعيادتك.'); return; } setLoading(true); setError(''); try { const response = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, organizationSlug }) }); if (!response.ok) throw new Error('البريد الإلكتروني أو كلمة المرور أو رمز العيادة غير صحيح.'); const data = await response.json(); setAccessToken(data.accessToken); window.location.href = '/dashboard'; } catch (err: unknown) { setError(err instanceof Error ? err.message : 'تعذر تسجيل الدخول.'); } finally { setLoading(false); } };
+  const handleGoogleLogin = () => { if (!organizationSlug.trim()) { setError('اكتب رمز العيادة أولًا لتسجيل الدخول بأمان.'); return; } window.location.href = `/api/v1/auth/google?organizationSlug=${encodeURIComponent(organizationSlug.trim())}`; };
+  return <main dir="rtl" className="min-h-screen bg-[#f5f9fd] px-4 py-6 sm:py-10"><section className="mx-auto grid min-h-[720px] max-w-5xl overflow-hidden rounded-[2rem] bg-white shadow-[0_24px_70px_-35px_rgba(21,67,113,.35)] ring-1 ring-[#dce8f3] lg:grid-cols-[.88fr_1.12fr]"><aside className="hidden bg-[#12395e] p-10 text-white lg:flex lg:flex-col"><BrandMark light /><div className="my-auto"><p className="text-sm font-extrabold tracking-[.13em] text-[#74dfd7]">CLINIC WORKSPACE</p><h1 className="mt-5 text-4xl font-extrabold leading-tight">كل ما يحتاجه فريق العيادة، في مسار واحد واضح.</h1><p className="mt-5 leading-8 text-blue-100">تسجيل منظم، Patient Profile واضح، وClinical Workspace مخصص للطبيب — مع بقاء بيانات كل عيادة في مساحة مستقلة.</p></div><p className="text-sm text-blue-200">Clinicos · Connected care, organized.</p></aside><div className="flex items-center p-6 sm:p-10"><div className="mx-auto w-full max-w-md"><div className="lg:hidden"><BrandMark /></div><p className="mt-7 text-sm font-extrabold tracking-wider text-[#087d78]">SECURE SIGN IN</p><h2 className="mt-2 text-3xl font-extrabold text-[#132f4e]">مرحبًا بعودتك</h2><p className="mt-2 text-sm leading-7 text-slate-600">ادخل إلى مساحة العيادة المخصصة لك باستخدام رمز العيادة وبيانات حسابك.</p>{isPublicDemo && <p className="mt-5 rounded-xl border border-[#bfe4f1] bg-[#eefaff] p-3 text-sm leading-6 text-[#17577c]">هذه نسخة تعريفية عامة؛ تسجيل الدخول وبيانات المرضى غير متاحين لحماية الخصوصية.</p>}{error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-3 text-sm leading-6 text-red-700">{error}</p>}<form className="mt-6 space-y-4" onSubmit={(event) => { event.preventDefault(); void handleLogin(); }}><Field label="Clinic Code · رمز العيادة"><input required value={organizationSlug} onChange={(event) => setOrganizationSlug(event.target.value)} autoComplete="organization" placeholder="مثال: my-clinic" className="field" /></Field><Field label="Work email · البريد الإلكتروني"><input required type="email" dir="ltr" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="name@clinic.com" className="field" /></Field><Field label="Password · كلمة المرور"><input required type="password" dir="ltr" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" className="field" /></Field><button type="submit" disabled={loading || isPublicDemo} className="mt-2 w-full rounded-xl bg-[#1768a8] px-4 py-3.5 font-extrabold text-white transition hover:bg-[#11598f] disabled:bg-slate-300">{isPublicDemo ? 'نسخة تعريفية' : loading ? 'جارٍ تأمين الدخول…' : 'دخول مساحة العمل'}</button></form><div className="my-5 flex items-center gap-3 text-xs text-slate-400 before:h-px before:flex-1 before:bg-slate-200 after:h-px after:flex-1 after:bg-slate-200">أو</div><button type="button" onClick={handleGoogleLogin} disabled={isPublicDemo} className="w-full rounded-xl border border-slate-300 px-4 py-3.5 font-extrabold text-[#173b63] transition hover:border-[#8abce4] hover:bg-[#f7fbff] disabled:bg-slate-100">المتابعة باستخدام Google</button><div className="mt-6 flex items-center justify-between text-sm"><Link href="/forgot-password" className="font-semibold text-[#1768a8] hover:underline">نسيت كلمة المرور؟</Link><Link href="/register" className="font-semibold text-[#1768a8] hover:underline">إنشاء عيادة جديدة</Link></div></div></div></section></main>;
 }
+
+function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid gap-2 text-sm font-extrabold text-[#29435f]"><span>{label}</span>{children}</label>; }

@@ -2,13 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .field {
+    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#4f97d0] focus:ring-4 focus:ring-blue-100;
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }
 
 body {
   @apply bg-slate-50 text-slate-900;
-  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+  font-family: var(--font-clinicos), "Segoe UI", Tahoma, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
