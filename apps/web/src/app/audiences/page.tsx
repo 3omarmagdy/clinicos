@@ -34,7 +34,8 @@ export default function AudiencesPage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { void load(initialFilters); }, []);
+  useEffect(() => { void load(initialFilters); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const apply = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); void load(); };
   const download = async () => {

@@ -13,22 +13,22 @@ datasource db {
 
 /// Organization is the root tenant entity. All data is isolated by organization.
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  timezone  String   @default("UTC")
-  currency  String   @default("EGP")
-  subscriptionPlan String @default("trial") // trial | clinic | center | enterprise
-  subscriptionStatus String @default("trial") // trial | active | suspended | expired
-  trialEndsAt DateTime?
-  subscriptionEndsAt DateTime?
-  prescriptionHeader String?
+  id                    String    @id @default(cuid())
+  name                  String
+  slug                  String    @unique
+  timezone              String    @default("UTC")
+  currency              String    @default("EGP")
+  subscriptionPlan      String    @default("trial") // trial | clinic | center | enterprise
+  subscriptionStatus    String    @default("trial") // trial | active | suspended | expired
+  trialEndsAt           DateTime?
+  subscriptionEndsAt    DateTime?
+  prescriptionHeader    String?
   prescriptionSubheader String?
-  prescriptionPhone String?
-  prescriptionAddress String?
-  prescriptionLogoUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  prescriptionPhone     String?
+  prescriptionAddress   String?
+  prescriptionLogoUrl   String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   // Relationships
   locations       Location[]
@@ -38,6 +38,7 @@ model Organization {
   patients        Patient[]
   clinicalRecords ClinicalRecord[]
   appointments    Appointment[]
+  visits          Visit[]
   auditLogs       AuditLog[]
   oauthLoginCodes OAuthLoginCode[]
 
@@ -78,6 +79,7 @@ model Patient {
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   clinicalRecords ClinicalRecord[]
   appointments    Appointment[]
+  visits          Visit[]
 
   @@unique([organizationId, medicalRecordNumber])
   @@index([organizationId, lastName, firstName])
@@ -91,25 +93,58 @@ model Patient {
 // ============================================================================
 
 model Appointment {
-  id             String   @id @default(cuid())
-  organizationId String
-  patientId      String
-  createdById    String
-  scheduledAt    DateTime
-  durationMinutes Int     @default(30)
-  status         String   @default("scheduled") // scheduled | confirmed | checked_in | completed | cancelled | no_show
-  reason         String?
-  notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  organizationId  String
+  patientId       String
+  createdById     String
+  doctorId        String?
+  scheduledAt     DateTime
+  durationMinutes Int      @default(30)
+  status          String   @default("scheduled") // scheduled | confirmed | checked_in | completed | cancelled | no_show
+  reason          String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
   createdBy    User         @relation("AppointmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  doctor       User?        @relation("AppointmentDoctor", fields: [doctorId], references: [id], onDelete: SetNull)
+  visit        Visit?
 
   @@index([organizationId, scheduledAt])
   @@index([organizationId, patientId])
   @@map("appointments")
+}
+
+// ============================================================================
+// VISITS
+// ============================================================================
+
+/// A visit is the operational encounter created when a patient checks in.
+model Visit {
+  id             String    @id @default(cuid())
+  organizationId String
+  appointmentId  String    @unique
+  patientId      String
+  doctorId       String?
+  createdById    String
+  status         String    @default("in_progress") // in_progress | completed | cancelled
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointment  Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor       User?        @relation("VisitDoctor", fields: [doctorId], references: [id], onDelete: SetNull)
+  createdBy    User         @relation("VisitCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, patientId, startedAt])
+  @@index([organizationId, status])
+  @@map("visits")
 }
 
 // ============================================================================
@@ -196,24 +231,27 @@ model Department {
 
 /// User represents any person interacting with the system.
 model User {
-  id             String    @id @default(cuid())
-  organizationId String
-  email          String
-  passwordHash   String
-  firstName      String
-  lastName       String
-  role           String    @default("receptionist") // owner | admin | doctor | receptionist | nurse | accountant | custom
-  status         String    @default("active") // active | inactive | suspended
-  isPlatformAdmin Boolean  @default(false)
-  lastLoginAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  organizationId  String
+  email           String
+  passwordHash    String
+  firstName       String
+  lastName        String
+  role            String    @default("receptionist") // owner | admin | doctor | receptionist | nurse | accountant | custom
+  status          String    @default("active") // active | inactive | suspended
+  isPlatformAdmin Boolean   @default(false)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   // Relationships
   organization            Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userRoles               UserRole[]
   authoredClinicalRecords ClinicalRecord[] @relation("ClinicalRecordAuthor")
   createdAppointments     Appointment[]    @relation("AppointmentCreator")
+  assignedAppointments    Appointment[]    @relation("AppointmentDoctor")
+  doctorVisits            Visit[]          @relation("VisitDoctor")
+  createdVisits           Visit[]          @relation("VisitCreator")
   auditLogs               AuditLog[]       @relation("AuditActor")
   oauthLoginCodes         OAuthLoginCode[]
 
@@ -226,13 +264,13 @@ model User {
 /// callback. It lets the browser obtain a normal Clinico session without
 /// exposing a JWT in the redirect URL.
 model OAuthLoginCode {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   userId         String
-  codeHash       String   @unique
+  codeHash       String    @unique
   expiresAt      DateTime
   usedAt         DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)

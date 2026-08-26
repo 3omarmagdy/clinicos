@@ -10,7 +10,7 @@
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
     "lint": "pnpm -r run lint",
-    "type-check": "pnpm --filter @clinicos/api run type-check && pnpm --filter @clinicos/web run type-check && pnpm --filter @clinicos/shared-types run type-check",
+    "type-check": "pnpm --filter @clinicos/shared-types run build && pnpm db:generate && pnpm --filter @clinicos/api run type-check && pnpm --filter @clinicos/web run type-check && pnpm --filter @clinicos/shared-types run type-check",
     "db:migrate": "pnpm --filter @clinicos/database exec prisma migrate deploy --schema prisma/schema.prisma",
     "db:generate": "pnpm --filter @clinicos/database exec prisma generate --schema prisma/schema.prisma",
     "db:seed": "pnpm --filter @clinicos/database exec prisma db seed --schema prisma/schema.prisma",
@@ -26,12 +26,5 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.1.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "prisma"
-    ]
   }
 }

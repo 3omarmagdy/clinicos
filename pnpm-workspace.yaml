@@ -2,4 +2,9 @@ packages:
   - "apps/*"
   - "packages/*"
 
-shared-workspace-lockfile: true
+sharedWorkspaceLockfile: true
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - prisma
