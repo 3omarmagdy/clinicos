@@ -40,8 +40,108 @@ model Organization {
   appointments    Appointment[]
   auditLogs       AuditLog[]
   oauthLoginCodes OAuthLoginCode[]
+  subscriptions   Subscription[]
+  payments        Payment[]
+  subscriptionEvents SubscriptionEvent[]
 
   @@map("organizations")
+}
+
+// ============================================================================
+// SAAS BILLING / ENTITLEMENTS
+// ============================================================================
+
+enum SubscriptionPlan {
+  FREE_TRIAL
+  STARTER
+  PROFESSIONAL
+  CLINIC
+  CENTER
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REJECTED
+  REFUNDED
+}
+
+/// One current subscription is maintained per tenant. Historical changes are
+/// retained as SubscriptionEvent records, so billing can evolve without
+/// exposing sensitive payment information to clinic users.
+model Subscription {
+  id                 String             @id @default(cuid())
+  organizationId     String
+  plan               SubscriptionPlan   @default(FREE_TRIAL)
+  status             SubscriptionStatus @default(TRIALING)
+  trialStartedAt     DateTime?
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  canceledAt         DateTime?
+  isCurrent          Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payments     Payment[]
+  events       SubscriptionEvent[]
+
+  @@index([organizationId, isCurrent])
+  @@index([organizationId, status])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  organizationId  String
+  subscriptionId  String
+  amount          Int
+  currency        String        @default("EGP")
+  paymentMethod   String        @default("manual_transfer")
+  reference       String
+  status          PaymentStatus @default(PENDING)
+  paidAt          DateTime?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  reviewedBy   User?        @relation("PaymentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, createdAt])
+  @@index([subscriptionId, status])
+  @@map("payments")
+}
+
+model SubscriptionEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  subscriptionId String
+  actorId        String?
+  action         String
+  summary        String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  actor        User?        @relation("SubscriptionEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([subscriptionId, createdAt])
+  @@map("subscription_events")
 }
 
 // ============================================================================
@@ -216,6 +316,8 @@ model User {
   createdAppointments     Appointment[]    @relation("AppointmentCreator")
   auditLogs               AuditLog[]       @relation("AuditActor")
   oauthLoginCodes         OAuthLoginCode[]
+  reviewedPayments        Payment[]        @relation("PaymentReviewer")
+  subscriptionEvents      SubscriptionEvent[] @relation("SubscriptionEventActor")
 
   @@unique([organizationId, email])
   @@index([organizationId, email])

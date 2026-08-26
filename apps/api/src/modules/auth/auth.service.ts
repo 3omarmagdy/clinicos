@@ -115,14 +115,9 @@ export class AuthService {
 
   private assertUserCanSignIn(user: AuthorizedUser): void {
     if (user.status !== 'active') throw new UnauthorizedException('User account is inactive');
-    if (user.isPlatformAdmin) return;
-
-    const now = new Date();
-    const { subscriptionStatus, trialEndsAt, subscriptionEndsAt } = user.organization;
-    const hasExpired = subscriptionStatus === 'expired' || subscriptionStatus === 'suspended'
-      || (subscriptionStatus === 'trial' && trialEndsAt !== null && trialEndsAt < now)
-      || (subscriptionStatus === 'active' && subscriptionEndsAt !== null && subscriptionEndsAt < now);
-    if (hasExpired) throw new UnauthorizedException('Clinic subscription is not active');
+    // Expiry does not lock clinicians out of their records. Write operations are
+    // centrally restricted by SubscriptionService, while this keeps the tenant
+    // able to review and export its own data safely.
   }
 
   getFrontendLoginUrl(): string {
@@ -254,6 +249,7 @@ export class AuthService {
         const organization = await tx.organization.create({
           data: { name: clinicName, slug: organizationSlug, timezone: 'Africa/Cairo', currency: 'EGP', subscriptionPlan: 'trial', subscriptionStatus: 'trial', trialEndsAt },
         });
+        const subscription = await tx.subscription.create({ data: { organizationId: organization.id, plan: 'FREE_TRIAL', status: 'TRIALING', trialStartedAt: new Date(), trialEndsAt } });
         const permissions = await tx.permission.findMany({ where: { code: { in: permissionDefinitions.map(([code]) => code) } } });
         const permissionIds = new Map(permissions.map((permission) => [permission.code, permission.id]));
         const rolePermissions: Record<string, string[]> = {
@@ -274,6 +270,7 @@ export class AuthService {
         const owner = await tx.user.create({
           data: { organizationId: organization.id, email, passwordHash, firstName: data.firstName.trim(), lastName: data.lastName.trim(), role: 'owner', status: 'active', userRoles: { create: { roleId: roles.get('Owner')! } } },
         });
+        await tx.subscriptionEvent.create({ data: { organizationId: organization.id, subscriptionId: subscription.id, actorId: owner.id, action: 'trial.started', summary: '14-day free trial started' } });
         await tx.auditLog.create({ data: { organizationId: organization.id, actorId: owner.id, action: 'organization.registered', entityType: 'organization', entityId: organization.id, summary: 'Clinic workspace created with a 14-day trial' } });
       });
     } catch (error) {

@@ -2,12 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AppointmentQueryDto, CreateAppointmentDto, UpdateAppointmentStatusDto } from './appointment.dto';
 import { AuditService } from '../audit/audit.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 const patientSelect = { id: true, firstName: true, lastName: true, medicalRecordNumber: true, phone: true } as const;
 
 @Injectable()
 export class AppointmentService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly subscriptions: SubscriptionService) {}
 
   async list(organizationId: string, query: AppointmentQueryDto) {
     const today = new Date();
@@ -21,6 +22,7 @@ export class AppointmentService {
   }
 
   async create(organizationId: string, createdById: string, data: CreateAppointmentDto) {
+    await this.subscriptions.assertLimit(organizationId, 'appointments');
     const patient = await this.prisma.patient.findFirst({ where: { id: data.patientId, organizationId }, select: { id: true } });
     if (!patient) throw new NotFoundException('Patient not found');
     const appointment = await this.prisma.appointment.create({
@@ -32,6 +34,7 @@ export class AppointmentService {
   }
 
   async updateStatus(id: string, organizationId: string, data: UpdateAppointmentStatusDto, actorId?: string) {
+    await this.subscriptions.assertCanWrite(organizationId);
     const existingAppointment = await this.prisma.appointment.findFirst({ where: { id, organizationId }, select: { id: true } });
     if (!existingAppointment) throw new NotFoundException('Appointment not found');
     const appointment = await this.prisma.appointment.update({ where: { id }, data: { status: data.status }, include: { patient: { select: patientSelect } } });
