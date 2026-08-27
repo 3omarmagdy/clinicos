@@ -151,7 +151,7 @@ export class WhatsAppMarketingService {
           { type: 'text', text: recipient.patient.firstName },
           { type: 'text', text: campaign.organizationName },
           { type: 'text', text: campaign.offerText },
-          { type: 'text', text: campaign.expiresAt ? new Intl.DateTimeFormat('ar-EG', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(campaign.expiresAt) : 'حتى نفاد الكمية' },
+          { type: 'text', text: 'انتهاء المدة المحددة' },
         ] }],
       },
     };
