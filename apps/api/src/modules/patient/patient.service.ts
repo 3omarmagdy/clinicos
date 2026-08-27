@@ -67,6 +67,8 @@ export class PatientService {
       marketingConsentAt,
       whatsappOptIn,
       whatsappOptInAt,
+      whatsappMarketingOptIn,
+      whatsappMarketingOptInAt,
       ...patientData
     } = data;
 
@@ -86,6 +88,8 @@ export class PatientService {
           marketingConsentAt: marketingConsentAt ? new Date(marketingConsentAt) : marketingConsent ? new Date() : undefined,
           whatsappOptIn: whatsappOptIn ?? false,
           whatsappOptInAt: whatsappOptInAt ? new Date(whatsappOptInAt) : whatsappOptIn ? new Date() : undefined,
+          whatsappMarketingOptIn: whatsappMarketingOptIn ?? false,
+          whatsappMarketingOptInAt: whatsappMarketingOptInAt ? new Date(whatsappMarketingOptInAt) : whatsappMarketingOptIn ? new Date() : undefined,
         },
       });
 
@@ -140,7 +144,7 @@ export class PatientService {
         batchPhones.add(phone);
       }
 
-      const { dateOfBirth, admittedAt, medicalRecordNumber, marketingConsent, marketingConsentAt, whatsappOptIn, whatsappOptInAt, ...patientData } = patient;
+      const { dateOfBirth, admittedAt, medicalRecordNumber, marketingConsent, marketingConsentAt, whatsappOptIn, whatsappOptInAt, whatsappMarketingOptIn, whatsappMarketingOptInAt, ...patientData } = patient;
       delete patientData.age;
       records.push({
         ...patientData,
@@ -153,6 +157,8 @@ export class PatientService {
         marketingConsentAt: marketingConsentAt ? new Date(marketingConsentAt) : marketingConsent ? new Date() : undefined,
         whatsappOptIn: whatsappOptIn ?? false,
         whatsappOptInAt: whatsappOptInAt ? new Date(whatsappOptInAt) : whatsappOptIn ? new Date() : undefined,
+        whatsappMarketingOptIn: whatsappMarketingOptIn ?? false,
+        whatsappMarketingOptInAt: whatsappMarketingOptInAt ? new Date(whatsappMarketingOptInAt) : whatsappMarketingOptIn ? new Date() : undefined,
       });
     }
 
@@ -227,6 +233,8 @@ export class PatientService {
         marketingConsentAt,
         whatsappOptIn,
         whatsappOptInAt,
+        whatsappMarketingOptIn,
+        whatsappMarketingOptInAt,
         ...patientData
       } = data;
 
@@ -241,6 +249,13 @@ export class PatientService {
         updateData.whatsappOptInAt = whatsappOptIn ? whatsappOptInAt ? new Date(whatsappOptInAt) : new Date() : null;
       } else if (whatsappOptInAt !== undefined) {
         updateData.whatsappOptInAt = whatsappOptInAt ? new Date(whatsappOptInAt) : null;
+      }
+
+      if (whatsappMarketingOptIn !== undefined) {
+        updateData.whatsappMarketingOptIn = whatsappMarketingOptIn;
+        updateData.whatsappMarketingOptInAt = whatsappMarketingOptIn ? whatsappMarketingOptInAt ? new Date(whatsappMarketingOptInAt) : new Date() : null;
+      } else if (whatsappMarketingOptInAt !== undefined) {
+        updateData.whatsappMarketingOptInAt = whatsappMarketingOptInAt ? new Date(whatsappMarketingOptInAt) : null;
       }
 
       if (marketingConsent !== undefined) {

@@ -39,6 +39,7 @@ model Organization {
   clinicalRecords ClinicalRecord[]
   appointments    Appointment[]
   visits          Visit[]
+  marketingCampaigns MarketingCampaign[]
   auditLogs       AuditLog[]
   oauthLoginCodes OAuthLoginCode[]
   subscriptions   Subscription[]
@@ -177,8 +178,10 @@ model Patient {
   maritalStatus         String?
   phone                 String?
   whatsappPhone         String?
-  whatsappOptIn         Boolean   @default(false)
-  whatsappOptInAt       DateTime?
+  whatsappOptIn             Boolean   @default(false)
+  whatsappOptInAt           DateTime?
+  whatsappMarketingOptIn    Boolean   @default(false)
+  whatsappMarketingOptInAt DateTime?
   occupation            String?
   city                  String?
   governorate           String?
@@ -197,12 +200,60 @@ model Patient {
   clinicalRecords ClinicalRecord[]
   appointments    Appointment[]
   visits          Visit[]
+  marketingCampaignRecipients MarketingCampaignRecipient[]
 
   @@unique([organizationId, medicalRecordNumber])
   @@index([organizationId, lastName, firstName])
   @@index([organizationId, phone])
   @@index([organizationId, admittedAt])
   @@map("patients")
+}
+
+// ============================================================================
+// WHATSAPP MARKETING CAMPAIGNS
+// ============================================================================
+
+model MarketingCampaign {
+  id             String   @id @default(cuid())
+  organizationId String
+  templateName   String
+  offerText      String
+  expiresAt      DateTime?
+  status         String   @default("DRAFT") // DRAFT | SENDING | COMPLETED | FAILED
+  createdById    String
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                         @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  recipients   MarketingCampaignRecipient[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, createdAt])
+  @@map("marketing_campaigns")
+}
+
+model MarketingCampaignRecipient {
+  id                String    @id @default(cuid())
+  campaignId        String
+  patientId         String
+  dedupeKey         String    @unique
+  status            String    @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  providerMessageId String?
+  failureReason     String?
+  sentAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  campaign MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  patient  Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, patientId])
+  @@index([campaignId, status])
+  @@index([patientId, createdAt])
+  @@map("marketing_campaign_recipients")
 }
 
 // ============================================================================
@@ -376,6 +427,7 @@ model User {
   passwordResetTokens     PasswordResetToken[]
   reviewedPayments        Payment[]        @relation("PaymentReviewer")
   subscriptionEvents      SubscriptionEvent[] @relation("SubscriptionEventActor")
+  createdMarketingCampaigns MarketingCampaign[]
 
   @@unique([organizationId, email])
   @@index([organizationId, email])
