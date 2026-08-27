@@ -65,6 +65,8 @@ export class PatientService {
       medicalRecordNumber,
       marketingConsent,
       marketingConsentAt,
+      whatsappOptIn,
+      whatsappOptInAt,
       ...patientData
     } = data;
 
@@ -81,12 +83,9 @@ export class PatientService {
           admittedAt: admittedAt ? new Date(admittedAt) : undefined,
 
           marketingConsent: marketingConsent ?? false,
-
-          marketingConsentAt: marketingConsentAt
-            ? new Date(marketingConsentAt)
-            : marketingConsent
-              ? new Date()
-              : undefined,
+          marketingConsentAt: marketingConsentAt ? new Date(marketingConsentAt) : marketingConsent ? new Date() : undefined,
+          whatsappOptIn: whatsappOptIn ?? false,
+          whatsappOptInAt: whatsappOptInAt ? new Date(whatsappOptInAt) : whatsappOptIn ? new Date() : undefined,
         },
       });
 
@@ -141,7 +140,7 @@ export class PatientService {
         batchPhones.add(phone);
       }
 
-      const { dateOfBirth, admittedAt, medicalRecordNumber, marketingConsent, marketingConsentAt, ...patientData } = patient;
+      const { dateOfBirth, admittedAt, medicalRecordNumber, marketingConsent, marketingConsentAt, whatsappOptIn, whatsappOptInAt, ...patientData } = patient;
       delete patientData.age;
       records.push({
         ...patientData,
@@ -152,6 +151,8 @@ export class PatientService {
         admittedAt: admittedAt ? new Date(admittedAt) : undefined,
         marketingConsent: marketingConsent ?? false,
         marketingConsentAt: marketingConsentAt ? new Date(marketingConsentAt) : marketingConsent ? new Date() : undefined,
+        whatsappOptIn: whatsappOptIn ?? false,
+        whatsappOptInAt: whatsappOptInAt ? new Date(whatsappOptInAt) : whatsappOptIn ? new Date() : undefined,
       });
     }
 
@@ -224,6 +225,8 @@ export class PatientService {
         admittedAt,
         marketingConsent,
         marketingConsentAt,
+        whatsappOptIn,
+        whatsappOptInAt,
         ...patientData
       } = data;
 
@@ -232,6 +235,13 @@ export class PatientService {
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
         admittedAt: admittedAt ? new Date(admittedAt) : undefined,
       };
+
+      if (whatsappOptIn !== undefined) {
+        updateData.whatsappOptIn = whatsappOptIn;
+        updateData.whatsappOptInAt = whatsappOptIn ? whatsappOptInAt ? new Date(whatsappOptInAt) : new Date() : null;
+      } else if (whatsappOptInAt !== undefined) {
+        updateData.whatsappOptInAt = whatsappOptInAt ? new Date(whatsappOptInAt) : null;
+      }
 
       if (marketingConsent !== undefined) {
         updateData.marketingConsent = marketingConsent;

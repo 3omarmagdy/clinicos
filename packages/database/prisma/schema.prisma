@@ -176,6 +176,9 @@ model Patient {
   gender                String?
   maritalStatus         String?
   phone                 String?
+  whatsappPhone         String?
+  whatsappOptIn         Boolean   @default(false)
+  whatsappOptInAt       DateTime?
   occupation            String?
   city                  String?
   governorate           String?
@@ -224,7 +227,9 @@ model Appointment {
   patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
   createdBy    User         @relation("AppointmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
   doctor       User?        @relation("AppointmentDoctor", fields: [doctorId], references: [id], onDelete: SetNull)
-  visit        Visit?
+    visit                Visit?
+  whatsappReminderSentAt DateTime?
+  whatsappReminderMessageId String?
 
   @@index([organizationId, scheduledAt])
   @@index([organizationId, patientId])

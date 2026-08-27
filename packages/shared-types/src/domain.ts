@@ -76,6 +76,9 @@ export interface Patient {
   gender?: string | null;
   maritalStatus?: string | null;
   phone?: string | null;
+  whatsappPhone?: string | null;
+  whatsappOptIn: boolean;
+  whatsappOptInAt?: Date | null;
   email?: string | null;
   address?: string | null;
 
@@ -153,6 +156,8 @@ export interface Appointment {
   patient?: Pick<Patient, 'id' | 'firstName' | 'lastName' | 'medicalRecordNumber' | 'phone'>;
   doctor?: Pick<User, 'id' | 'firstName' | 'lastName' | 'email'> | null;
   visit?: Visit | null;
+  whatsappReminderSentAt?: Date | null;
+  whatsappReminderMessageId?: string | null;
 }
 
 export interface Visit {
