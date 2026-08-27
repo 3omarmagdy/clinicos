@@ -17,6 +17,15 @@ GOOGLE_CLIENT_ID="GOOGLE_OAUTH_CLIENT_ID"
 GOOGLE_CLIENT_SECRET="GOOGLE_OAUTH_CLIENT_SECRET"
 GOOGLE_REDIRECT_URI="https://api.example.com/api/v1/auth/google/callback"
 APP_VERSION=0.0.1
+
+# Client-visible manual payment instructions. Do not use these for secrets.
+PAYMENT_BANK_NAME="YOUR_BANK_NAME"
+PAYMENT_ACCOUNT_NAME="YOUR_ACCOUNT_HOLDER_NAME"
+PAYMENT_ACCOUNT_NUMBER="YOUR_ACCOUNT_NUMBER_OR_MASKED_ACCOUNT"
+PAYMENT_IBAN="YOUR_IBAN_IF_APPLICABLE"
+PAYMENT_INSTAPAY_ADDRESS="YOUR_INSTAPAY_ADDRESS"
+PAYMENT_REVIEW_WINDOW="تتم مراجعة الطلب خلال أيام العمل بعد التحقق من التحويل."
+PAYMENT_INSTRUCTIONS_NOTE="لا ترسل كلمة المرور أو PIN أو OTP أو بيانات البطاقة. أدخل رقم العملية فقط."
 ```
 
 For the hosted frontend, set `NEXT_PUBLIC_DEMO_MODE=false` and
