@@ -78,6 +78,20 @@ enum PaymentStatus {
 /// One current subscription is maintained per tenant. Historical changes are
 /// retained as SubscriptionEvent records, so billing can evolve without
 /// exposing sensitive payment information to clinic users.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("password_reset_tokens")
+}
+
 model Subscription {
   id                 String             @id @default(cuid())
   organizationId     String
@@ -354,6 +368,7 @@ model User {
   createdVisits           Visit[]          @relation("VisitCreator")
   auditLogs               AuditLog[]       @relation("AuditActor")
   oauthLoginCodes         OAuthLoginCode[]
+  passwordResetTokens     PasswordResetToken[]
   reviewedPayments        Payment[]        @relation("PaymentReviewer")
   subscriptionEvents      SubscriptionEvent[] @relation("SubscriptionEventActor")
 

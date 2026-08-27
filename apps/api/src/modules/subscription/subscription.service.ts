@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException } 
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { CreateManualPaymentDto, ReviewPaymentDto } from './subscription.dto';
+import { EmailService } from '../auth/email.service';
 
 type LimitKey = 'users' | 'doctors' | 'patients' | 'appointments' | 'branches';
 type PlanName = 'FREE_TRIAL' | 'STARTER' | 'PROFESSIONAL' | 'CLINIC' | 'CENTER';
@@ -16,7 +17,7 @@ export const PLAN_CATALOG: Record<PlanName, { label: string; priceEgp: number | 
 
 @Injectable()
 export class SubscriptionService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly email: EmailService) {}
 
   private legacyPlan(plan: string): PlanName {
     const value = plan.toUpperCase();
@@ -106,12 +107,32 @@ export class SubscriptionService {
     if (!payment) throw new NotFoundException('Payment request not found');
     if (payment.status !== 'PENDING') throw new ConflictException('This payment request has already been reviewed');
     if (data.action === 'reject') {
-      const rejected = await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'REJECTED', reviewedById: actorId, reviewedAt: new Date(), rejectionReason: data.rejectionReason?.trim() || 'Payment could not be verified' } });
-      await this.prisma.subscriptionEvent.create({ data: { organizationId: payment.organizationId, subscriptionId: payment.subscriptionId, actorId, action: 'payment.rejected', summary: 'Manual payment request rejected' } }); return rejected;
+      const rejectionReason = data.rejectionReason?.trim() || 'Payment could not be verified';
+      const rejected = await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'REJECTED', reviewedById: actorId, reviewedAt: new Date(), rejectionReason } });
+      await this.prisma.subscriptionEvent.create({ data: { organizationId: payment.organizationId, subscriptionId: payment.subscriptionId, actorId, action: 'payment.rejected', summary: 'Manual payment request rejected' } });
+      const owner = await this.prisma.user.findFirst({ where: { organizationId: payment.organizationId, role: 'owner', status: 'active' }, select: { email: true, firstName: true } });
+      if (owner) {
+        try {
+          await this.email.sendTransactional({
+            to: owner.email,
+            subject: 'تحديث طلب الدفع في Clinicos',
+            text: `مرحبًا ${owner.firstName}، تم رفض طلب الدفع ذي المرجع ${payment.reference}. السبب: ${rejectionReason}`,
+            html: `<p>مرحبًا ${this.escapeHtml(owner.firstName)}،</p><p>تم رفض طلب الدفع ذي المرجع <strong>${this.escapeHtml(payment.reference)}</strong>.</p><p><strong>السبب:</strong> ${this.escapeHtml(rejectionReason)}</p><p>يمكنك إرسال طلب جديد بعد مراجعة بيانات التحويل.</p>`,
+            idempotencyKey: `payment-rejected-${payment.id}`,
+          });
+        } catch {
+          // Payment state remains authoritative even if optional notification delivery fails.
+        }
+      }
+      return rejected;
     }
     const plan = this.planForAmount(payment.amount); const now = new Date(); const end = new Date(now); end.setMonth(end.getMonth() + 1);
     const [approved] = await this.prisma.$transaction([this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'PAID', paidAt: now, reviewedById: actorId, reviewedAt: now } }), this.prisma.subscription.update({ where: { id: payment.subscriptionId }, data: { plan, status: 'ACTIVE', trialEndsAt: null, currentPeriodStart: now, currentPeriodEnd: end, canceledAt: null } }), this.prisma.organization.update({ where: { id: payment.organizationId }, data: { subscriptionPlan: plan.toLowerCase(), subscriptionStatus: 'active', trialEndsAt: null, subscriptionEndsAt: end } }), this.prisma.subscriptionEvent.create({ data: { organizationId: payment.organizationId, subscriptionId: payment.subscriptionId, actorId, action: 'subscription.activated', summary: `${plan} plan activated after payment approval` } })]);
     await this.audit.log({ organizationId: payment.organizationId, actorId, action: 'subscription.activated', entityType: 'payment', entityId: payment.id, summary: `${plan} plan payment approved` }); return approved;
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character] ?? character);
   }
 
   private planForAmount(amount: number): PlanName { return (Object.entries(PLAN_CATALOG).find(([, value]) => value.priceEgp === amount)?.[0] || 'STARTER') as PlanName; }
