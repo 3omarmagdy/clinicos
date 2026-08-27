@@ -10,7 +10,7 @@ export class WhatsAppController {
 
   @Post('reminders/run')
   runReminders(@Headers('authorization') authorization?: string) {
-    const expected = process.env.WHATSAPP_CRON_SECRET;
+    const expected = process.env.CRON_SECRET || process.env.WHATSAPP_CRON_SECRET;
     if (!expected || authorization !== `Bearer ${expected}`) throw new UnauthorizedException('Invalid automation credential');
     return this.whatsapp.runDueReminders();
   }
