@@ -12,7 +12,9 @@ type PaymentInstructions = {
   accountName: string;
   accountNumber: string;
   iban: string;
+  swiftCode: string;
   instapayAddress: string;
+  emoneyPhone: string;
   reviewWindow: string;
   note: string;
 };
@@ -46,7 +48,9 @@ const emptyInstructions: PaymentInstructions = {
   accountName: '',
   accountNumber: '',
   iban: '',
+  swiftCode: '',
   instapayAddress: '',
+  emoneyPhone: '',
   reviewWindow: 'تتم مراجعة الطلب خلال أيام العمل بعد التحقق من التحويل.',
   note: 'لا ترسل كلمة المرور أو PIN أو OTP أو بيانات البطاقة. أدخل رقم العملية فقط.',
 };
@@ -60,6 +64,7 @@ export default function SubscriptionPage() {
   const [reference, setReference] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [copied, setCopied] = useState('');
   const [saving, setSaving] = useState(false);
   const allowed = hasSessionPermission('organization:update');
 
@@ -111,10 +116,17 @@ export default function SubscriptionPage() {
     }
   };
 
+  const copyValue = async (label: string, value: string) => {
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    setCopied(label);
+    window.setTimeout(() => setCopied((current) => current === label ? '' : current), 1800);
+  };
+
   const detail = (label: string, value: string) => value ? (
     <div className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
       <p className="text-xs font-semibold text-slate-500">{label}</p>
-      <p className="mt-1 break-all font-bold text-slate-900" dir={label.includes('IBAN') || label.includes('InstaPay') ? 'ltr' : undefined}>{value}</p>
+      <p className="mt-1 break-all font-bold text-slate-900" dir={label.includes('IBAN') || label.includes('InstaPay') || label.includes('SWIFT') ? 'ltr' : undefined}>{value}</p>
     </div>
   ) : null;
 
@@ -150,22 +162,19 @@ export default function SubscriptionPage() {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-extrabold tracking-[.14em] text-[#1768a8]">HOW TO PAY MANUALLY</p>
-                <h2 className="mt-2 text-xl font-black">تعليمات التحويل وتفعيل الباقة</h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">حوّل قيمة الباقة المختارة، ثم اكتب رقم العملية كما يظهر في تطبيق البنك أو InstaPay. لا نطلب كلمة المرور أو الرقم السري أو رمز التحقق.</p>
+                <h2 className="mt-2 text-xl font-black">اختَر وسيلة الدفع المناسبة</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">استخدم وسيلة الدفع المناسبة لك، ثم اضغط على الشعار أو زر النسخ بجوار بيانات التحويل. بعد الدفع أدخل رقم العملية فقط؛ لا نطلب كلمة المرور أو الرقم السري أو رمز التحقق.</p>
               </div>
               <span className="rounded-full bg-[#edf6ff] px-4 py-2 text-xs font-bold text-[#176b9d]">تفعيل بعد المراجعة</span>
             </div>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl bg-[#f7fafc] p-5 ring-1 ring-slate-100">
-                <h3 className="font-black">تحويل بنكي</h3>
-                <div className="mt-3 grid gap-3">{detail('البنك', instructions.bankName)}{detail('اسم المستفيد', instructions.accountName)}{detail('رقم الحساب', instructions.accountNumber)}{detail('IBAN', instructions.iban)}{!instructions.bankName && !instructions.accountNumber && !instructions.iban && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">سيتم عرض بيانات الحساب هنا بعد ضبطها من إعدادات الإدارة.</p>}</div>
-              </div>
-              <div className="rounded-2xl bg-[#f7fafc] p-5 ring-1 ring-slate-100">
-                <h3 className="font-black">InstaPay</h3>
-                <div className="mt-3">{detail('عنوان InstaPay', instructions.instapayAddress) ?? <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">سيتم عرض عنوان InstaPay هنا بعد ضبطه من إعدادات الإدارة.</p>}</div>
-                <p className="mt-4 text-sm leading-6 text-slate-600">بعد التحويل، احتفظ بإيصال العملية وأدخل رقم المرجع فقط في النموذج أدناه.</p>
-              </div>
+            <div className="mt-5 grid gap-4 lg:grid-cols-3">
+              <PaymentMethodCard logo="/payment/instapay.webp" alt="InstaPay" title="InstaPay" value={instructions.instapayAddress} actionLabel="نسخ عنوان InstaPay" copied={copied === 'instapay'} onCopy={() => void copyValue('instapay', instructions.instapayAddress)} externalHref="https://www.instapay.eg/" externalLabel="فتح موقع InstaPay" />
+              <PaymentMethodCard logo="/payment/nbe.png" alt={instructions.bankName || 'البنك'} title="تحويل بنكي" value={instructions.iban || instructions.accountNumber} actionLabel={instructions.iban ? 'نسخ IBAN' : 'نسخ رقم الحساب'} copied={copied === 'bank'} onCopy={() => void copyValue('bank', instructions.iban || instructions.accountNumber)} />
+              <PaymentMethodCard logo="/payment/emoney.jpg" alt="e& money" title="محفظة e& money" value={instructions.emoneyPhone} actionLabel="نسخ رقم المحفظة" copied={copied === 'emoney'} onCopy={() => void copyValue('emoney', instructions.emoneyPhone)} externalHref={instructions.emoneyPhone ? `tel:${instructions.emoneyPhone}` : undefined} externalLabel="الاتصال بالرقم" />
             </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{detail('البنك', instructions.bankName)}{detail('اسم المستفيد', instructions.accountName)}{detail('رقم الحساب', instructions.accountNumber)}{detail('IBAN', instructions.iban)}{detail('SWIFT / BIC (اختياري)', instructions.swiftCode)}</div>
+            {!instructions.bankName && !instructions.accountNumber && !instructions.iban && !instructions.instapayAddress && !instructions.emoneyPhone && <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">سيتم عرض بيانات الدفع هنا بعد ضبطها من إعدادات الإدارة.</p>}
+            <p className="mt-5 text-sm leading-6 text-slate-600">بعد التحويل، احتفظ بإيصال العملية وأدخل رقم المرجع فقط في النموذج أدناه. زر الشعار ينسخ البيانات، والرابط الخارجي يفتح الموقع أو الاتصال فقط؛ لا يتم تحويل الأموال تلقائيًا من Clinicos.</p>
             <div className="mt-4 rounded-xl bg-[#12395e] p-4 text-sm leading-6 text-white"><strong>مراجعة الطلب:</strong> {instructions.reviewWindow}<br /><span className="text-blue-100">{instructions.note}</span></div>
           </section>
 
@@ -189,4 +198,9 @@ export default function SubscriptionPage() {
       </section>
     </main>
   );
+}
+
+
+function PaymentMethodCard({ logo, alt, title, value, actionLabel, copied, onCopy, externalHref, externalLabel }: { logo: string; alt: string; title: string; value: string; actionLabel: string; copied: boolean; onCopy: () => void; externalHref?: string; externalLabel?: string }) {
+  return <article className="flex min-h-[250px] flex-col rounded-2xl border border-[#dce7f1] bg-[#f7fafc] p-5"><button type="button" onClick={onCopy} disabled={!value} className="group flex min-h-20 items-center justify-center rounded-xl bg-white p-3 ring-1 ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50" title={value ? actionLabel : 'لا توجد بيانات بعد'}><img src={logo} alt={alt} className="h-16 w-32 object-contain transition group-hover:scale-105" /></button><h3 className="mt-4 text-lg font-black text-[#153c63]">{title}</h3><p className="mt-2 min-h-12 break-all font-bold text-slate-700" dir="ltr">{value || 'سيتم ضبط البيانات من الإدارة'}</p><div className="mt-auto flex flex-wrap gap-2 pt-4"><button type="button" onClick={onCopy} disabled={!value} className="rounded-lg bg-[#176b9d] px-3 py-2 text-xs font-black text-white disabled:opacity-50">{copied ? 'تم النسخ' : actionLabel}</button>{externalHref && externalLabel && <a href={externalHref} target={externalHref.startsWith('http') ? '_blank' : undefined} rel={externalHref.startsWith('http') ? 'noreferrer' : undefined} className="rounded-lg border border-[#b9d9ee] px-3 py-2 text-xs font-bold text-[#176b9d]">{externalLabel}</a>}</div></article>;
 }
