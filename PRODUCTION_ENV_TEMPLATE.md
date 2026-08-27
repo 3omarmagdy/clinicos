@@ -27,7 +27,11 @@ PAYMENT_INSTAPAY_ADDRESS="YOUR_INSTAPAY_ADDRESS"
 PAYMENT_REVIEW_WINDOW="تتم مراجعة الطلب خلال أيام العمل بعد التحقق من التحويل."
 PAYMENT_INSTRUCTIONS_NOTE="لا ترسل كلمة المرور أو PIN أو OTP أو بيانات البطاقة. أدخل رقم العملية فقط."
 
-# WhatsApp Cloud API. Keep access and cron secrets in Vercel/GitHub secrets only.
+# Transactional email delivery. Keep the API key in Vercel only.
+RESEND_API_KEY="YOUR_RESEND_API_KEY"
+EMAIL_FROM="Clinicos <noreply@your-verified-domain.com>"
+
+# WhatsApp Cloud API. Keep access and cron secrets in Vercel only.
 WHATSAPP_ACCESS_TOKEN="YOUR_META_ACCESS_TOKEN"
 WHATSAPP_PHONE_NUMBER_ID="YOUR_WHATSAPP_PHONE_NUMBER_ID"
 WHATSAPP_API_VERSION="v26.0"

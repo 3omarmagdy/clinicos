@@ -5,6 +5,8 @@ import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthToken, LoginCredentials, JwtPayload } from '@clinicos/shared-types';
 import type { RegisterClinicDto } from './dto/register-clinic.dto';
+import type { RequestPasswordResetDto, ResetPasswordDto } from './dto/password-reset.dto';
+import { EmailService } from './email.service';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const bcrypt = require('bcryptjs');
@@ -37,6 +39,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private email: EmailService,
   ) {}
 
   async login(credentials: LoginCredentials): Promise<AuthToken> {
@@ -214,6 +217,58 @@ export class AuthService {
 
   validateToken(token: string): JwtPayload {
     return this.jwtService.verify(token);
+  }
+
+  async requestPasswordReset(data: RequestPasswordResetDto): Promise<{ message: string }> {
+    const email = data.email.trim().toLowerCase();
+    const genericMessage = 'إذا كانت البيانات صحيحة، ستصلك رسالة استعادة على بريدك الإلكتروني.';
+    const user = await this.prisma.user.findFirst({
+      where: { email, organization: { slug: data.organizationSlug.trim() } },
+      select: { id: true, email: true, firstName: true },
+    });
+
+    if (!user) {
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      return { message: genericMessage };
+    }
+
+    const recentRequests = await this.prisma.passwordResetToken.count({ where: { userId: user.id, createdAt: { gte: new Date(Date.now() - 15 * 60 * 1000) } } });
+    if (recentRequests >= 3) return { message: genericMessage };
+    await this.prisma.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } });
+    const rawToken = randomBytes(32).toString('base64url');
+    const tokenHash = this.hashCode(rawToken);
+    const resetToken = await this.prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt: new Date(Date.now() + 15 * 60 * 1000) } });
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetUrl = `${frontendUrl.replace(/\/$/, '')}/reset-password?token=${encodeURIComponent(rawToken)}`;
+
+    try {
+      await this.email.sendTransactional({
+        to: user.email,
+        subject: 'استعادة كلمة مرور Clinicos',
+        text: `مرحبًا ${user.firstName}، استخدم الرابط التالي لإنشاء كلمة مرور جديدة خلال 15 دقيقة:\n${resetUrl}\nإذا لم تطلب ذلك، تجاهل هذه الرسالة.`,
+        html: `<p>مرحبًا ${user.firstName}،</p><p>اضغط على الرابط التالي لإنشاء كلمة مرور جديدة. الرابط صالح لمدة 15 دقيقة ويُستخدم مرة واحدة:</p><p><a href="${resetUrl}">استعادة كلمة المرور</a></p><p>إذا لم تطلب ذلك، تجاهل هذه الرسالة.</p>`,
+      });
+    } catch (error) {
+      await this.prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { usedAt: new Date() } });
+      this.logger.error(`Password reset email could not be delivered for user ${user.id}`);
+      throw error;
+    }
+
+    return { message: genericMessage };
+  }
+
+  async resetPassword(data: ResetPasswordDto): Promise<{ message: string }> {
+    const tokenHash = this.hashCode(data.token);
+    const record = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+    if (!record || record.usedAt || record.expiresAt <= new Date()) throw new UnauthorizedException('Reset link is invalid or expired');
+
+    const passwordHash = await bcrypt.hash(data.password, 12);
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash } }),
+      this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+      this.prisma.passwordResetToken.updateMany({ where: { userId: record.userId, usedAt: null, id: { not: record.id } }, data: { usedAt: new Date() } }),
+    ]);
+    return { message: 'تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن.' };
   }
 
   async registerClinic(data: RegisterClinicDto): Promise<AuthToken & { organizationSlug: string }> {

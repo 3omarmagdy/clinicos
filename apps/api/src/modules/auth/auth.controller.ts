@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import type { LoginCredentials, AuthToken } from '@clinicos/shared-types';
 import { RegisterClinicDto } from './dto/register-clinic.dto';
+import { RequestPasswordResetDto, ResetPasswordDto } from './dto/password-reset.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -23,6 +24,16 @@ export class AuthController {
     }
 
     return this.authService.login(credentials);
+  }
+
+  @Post('forgot-password')
+  async requestPasswordReset(@Body() data: RequestPasswordResetDto): Promise<{ message: string }> {
+    return this.authService.requestPasswordReset(data);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() data: ResetPasswordDto): Promise<{ message: string }> {
+    return this.authService.resetPassword(data);
   }
 
   /** Creates an isolated clinic workspace and signs in its first owner. */
