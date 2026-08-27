@@ -147,7 +147,8 @@ export class WhatsAppService {
   }
 
   private reminderWindowMinutes(): number {
-    const value = Number(process.env.WHATSAPP_REMINDER_WINDOW_MINUTES || 15);
+    // Hobby Vercel runs once per day, so the default window spans 12 hours on each side of the 24-hour target.
+    const value = Number(process.env.WHATSAPP_REMINDER_WINDOW_MINUTES || 720);
     return Number.isFinite(value) && value >= 5 ? value : 15;
   }
 
