@@ -41,7 +41,7 @@ export default function CampaignsPage() {
   const previewAudience = async () => {
     setBusy(true); setError(''); setNotice('');
     try {
-      const response = await authenticatedFetch('/api/v1/whatsapp/campaigns/preview', { method: 'POST', body: JSON.stringify({ ...filterPayload(filters), offerText: offerText || 'عرض تجريبي', ...(expiresAt ? { expiresAt: new Date(`${expiresAt}T12:00:00`).toISOString() } : {}) }) });
+      const response = await authenticatedFetch('/api/v1/whatsapp/campaigns/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...filterPayload(filters), offerText: offerText || 'عرض تجريبي', ...(expiresAt ? { expiresAt: new Date(`${expiresAt}T12:00:00`).toISOString() } : {}) }) });
       if (!response.ok) throw new Error(await getApiErrorMessage(response, 'تعذر معاينة المرضى الموافقين.'));
       setPreview(await response.json() as Preview);
     } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'تعذر معاينة المرضى الموافقين.'); }
