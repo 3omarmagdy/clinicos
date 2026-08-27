@@ -26,6 +26,10 @@ PAYMENT_IBAN="YOUR_IBAN_IF_APPLICABLE"
 PAYMENT_INSTAPAY_ADDRESS="YOUR_INSTAPAY_ADDRESS"
 PAYMENT_REVIEW_WINDOW="تتم مراجعة الطلب خلال أيام العمل بعد التحقق من التحويل."
 PAYMENT_INSTRUCTIONS_NOTE="لا ترسل كلمة المرور أو PIN أو OTP أو بيانات البطاقة. أدخل رقم العملية فقط."
+
+# Transactional email delivery. Keep the API key in Vercel only.
+RESEND_API_KEY="YOUR_RESEND_API_KEY"
+EMAIL_FROM="Clinicos <noreply@your-verified-domain.com>"
 ```
 
 For the hosted frontend, set `NEXT_PUBLIC_DEMO_MODE=false` and
