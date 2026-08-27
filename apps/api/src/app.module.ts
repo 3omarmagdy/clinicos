@@ -13,6 +13,7 @@ import { AppointmentModule } from './modules/appointment/appointment.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
     AuditModule,
     PlatformModule,
     SubscriptionModule,
+    WhatsAppModule,
   ],
   controllers: [AppController],
   providers: [AppService],

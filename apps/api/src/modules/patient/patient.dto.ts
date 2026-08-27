@@ -36,6 +36,8 @@ export class CreatePatientDto {
   @IsOptional() @IsString() @MaxLength(40) gender?: string;
   @IsOptional() @IsIn(['single', 'married', 'divorced', 'widowed', 'other']) maritalStatus?: string;
   @IsOptional() @IsString() @MaxLength(30) phone?: string;
+  @IsOptional() @IsString() @MaxLength(30) whatsappPhone?: string;
+  @IsOptional() @IsBoolean() whatsappOptIn?: boolean;
   @IsOptional() @IsEmail() @MaxLength(254) email?: string;
   @IsOptional() @IsString() @MaxLength(500) address?: string;
 
@@ -48,6 +50,8 @@ export class CreatePatientDto {
   @IsOptional() @IsBoolean() marketingConsent?: boolean;
 
   @IsOptional() @IsDateString() marketingConsentAt?: string;
+
+  @IsOptional() @IsDateString() whatsappOptInAt?: string;
 
   @IsOptional() @IsString() @MaxLength(160) emergencyContactName?: string;
   @IsOptional() @IsString() @MaxLength(30) emergencyContactPhone?: string;
@@ -67,6 +71,8 @@ export class UpdatePatientDto {
   @IsOptional() @IsString() @MaxLength(40) gender?: string;
   @IsOptional() @IsIn(['single', 'married', 'divorced', 'widowed', 'other']) maritalStatus?: string;
   @IsOptional() @IsString() @MaxLength(30) phone?: string;
+  @IsOptional() @IsString() @MaxLength(30) whatsappPhone?: string;
+  @IsOptional() @IsBoolean() whatsappOptIn?: boolean;
   @IsOptional() @IsEmail() @MaxLength(254) email?: string;
   @IsOptional() @IsString() @MaxLength(500) address?: string;
 
@@ -79,6 +85,8 @@ export class UpdatePatientDto {
   @IsOptional() @IsBoolean() marketingConsent?: boolean;
 
   @IsOptional() @IsDateString() marketingConsentAt?: string;
+
+  @IsOptional() @IsDateString() whatsappOptInAt?: string;
 
   @IsOptional() @IsString() @MaxLength(160) emergencyContactName?: string;
   @IsOptional() @IsString() @MaxLength(30) emergencyContactPhone?: string;
