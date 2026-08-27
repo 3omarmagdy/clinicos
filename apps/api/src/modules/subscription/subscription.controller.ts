@@ -11,6 +11,7 @@ import { PLAN_CATALOG, SubscriptionService } from './subscription.service';
 export class SubscriptionController {
   constructor(private readonly subscriptions: SubscriptionService) {}
   @Get('plans') plans() { return PLAN_CATALOG; }
+  @Get('payment-instructions') @RequirePermissions('organization:read') paymentInstructions() { return this.subscriptions.paymentInstructions(); }
   @Get('current') @RequirePermissions('organization:read') current(@Req() req: { user: AuthContext }) { return this.subscriptions.current(req.user.organizationId); }
   @Get('payments') @RequirePermissions('organization:read') payments(@Req() req: { user: AuthContext }) { return this.subscriptions.listPayments(req.user.organizationId); }
   @Post('payments') @RequirePermissions('organization:update') payment(@Req() req: { user: AuthContext }, @Body() data: CreateManualPaymentDto) { return this.subscriptions.requestPayment(req.user.organizationId, data, req.user.userId); }

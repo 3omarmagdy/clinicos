@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export const paidPlans = ['STARTER', 'PROFESSIONAL', 'CLINIC', 'CENTER'] as const;
 
@@ -7,6 +7,7 @@ export class CreateManualPaymentDto {
   plan!: (typeof paidPlans)[number];
 
   @IsString()
+  @MinLength(4)
   @MaxLength(100)
   reference!: string;
 

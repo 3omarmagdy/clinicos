@@ -46,6 +46,18 @@ export class SubscriptionService {
     return subscription;
   }
 
+  async paymentInstructions() {
+    return {
+      bankName: process.env.PAYMENT_BANK_NAME || '',
+      accountName: process.env.PAYMENT_ACCOUNT_NAME || '',
+      accountNumber: process.env.PAYMENT_ACCOUNT_NUMBER || '',
+      iban: process.env.PAYMENT_IBAN || '',
+      instapayAddress: process.env.PAYMENT_INSTAPAY_ADDRESS || '',
+      reviewWindow: process.env.PAYMENT_REVIEW_WINDOW || 'تتم مراجعة الطلب خلال أيام العمل بعد التحقق من التحويل.',
+      note: process.env.PAYMENT_INSTRUCTIONS_NOTE || 'لا ترسل كلمة المرور أو PIN أو OTP أو بيانات البطاقة. أدخل رقم العملية فقط.',
+    };
+  }
+
   async current(organizationId: string) {
     const subscription = await this.resolveStatus(organizationId);
     const catalog = PLAN_CATALOG[subscription.plan as PlanName];
