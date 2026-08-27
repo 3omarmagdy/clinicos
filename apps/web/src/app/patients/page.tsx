@@ -40,6 +40,7 @@ const emptyPatientForm = {
   phone: '',
   whatsappPhone: '',
   whatsappOptIn: false,
+  whatsappMarketingOptIn: false,
   gender: '',
   maritalStatus: '',
   occupation: '',
@@ -107,6 +108,8 @@ export default function PatientsPage() {
           whatsappPhone: formValues.whatsappPhone || undefined,
           whatsappOptIn: formValues.whatsappOptIn,
           whatsappOptInAt: formValues.whatsappOptIn ? new Date().toISOString() : undefined,
+          whatsappMarketingOptIn: formValues.whatsappMarketingOptIn,
+          whatsappMarketingOptInAt: formValues.whatsappMarketingOptIn ? new Date().toISOString() : undefined,
           gender: formValues.gender || undefined,
           maritalStatus: formValues.maritalStatus || undefined,
           occupation: formValues.occupation || undefined,
@@ -157,6 +160,7 @@ export default function PatientsPage() {
           <label className="grid gap-1 text-sm font-medium text-slate-700">Phone<input required name="phone" value={formValues.phone} onChange={(event) => setFormValues((current) => ({ ...current, phone: event.target.value }))} maxLength={30} className="rounded border p-2 font-normal" /></label>
           <label className="grid gap-1 text-sm font-medium text-slate-700">WhatsApp number<input name="whatsappPhone" value={formValues.whatsappPhone} onChange={(event) => setFormValues((current) => ({ ...current, whatsappPhone: event.target.value }))} maxLength={30} placeholder="مثال: +2010…" className="rounded border p-2 font-normal" /></label>
           <label className="flex items-start gap-2 rounded border border-[#bfe6e1] bg-[#f0fbf9] p-3 text-sm text-[#176763] sm:col-span-2"><input name="whatsappOptIn" type="checkbox" checked={formValues.whatsappOptIn} onChange={(event) => setFormValues((current) => ({ ...current, whatsappOptIn: event.target.checked }))} className="mt-1" /><span>وافق المريض صراحةً على استقبال تذكيرات المواعيد عبر WhatsApp.</span></label>
+          <label className="flex items-start gap-2 rounded border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950 sm:col-span-2"><input name="whatsappMarketingOptIn" type="checkbox" checked={formValues.whatsappMarketingOptIn} onChange={(event) => setFormValues((current) => ({ ...current, whatsappMarketingOptIn: event.target.checked }))} className="mt-1" /><span>وافق المريض صراحةً على استقبال العروض والتواصل التسويقي عبر WhatsApp. هذه الموافقة منفصلة عن تذكيرات المواعيد.</span></label>
           <label className="grid gap-1 text-sm font-medium text-slate-700">Admission date<input required name="admittedAt" type="date" lang="en" dir="ltr" value={formValues.admittedAt} onChange={(event) => setFormValues((current) => ({ ...current, admittedAt: event.target.value }))} className="rounded border p-2 font-normal" /></label>
           <label className="grid gap-1 text-sm font-medium text-slate-700">Gender<select name="gender" value={formValues.gender} onChange={(event) => setFormValues((current) => ({ ...current, gender: event.target.value }))} className="rounded border p-2 font-normal"><option value="">Not recorded</option><option value="female">Female</option><option value="male">Male</option></select></label>
           <label className="grid gap-1 text-sm font-medium text-slate-700">Marital status<select name="maritalStatus" value={formValues.maritalStatus} onChange={(event) => setFormValues((current) => ({ ...current, maritalStatus: event.target.value }))} className="rounded border p-2 font-normal"><option value="">Not recorded</option><option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option><option value="widowed">Widowed</option><option value="other">Other</option></select></label>

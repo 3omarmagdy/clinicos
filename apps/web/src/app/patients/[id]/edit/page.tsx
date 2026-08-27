@@ -18,6 +18,7 @@ interface Patient {
   whatsappPhone?: string | null;
   whatsappOptIn: boolean;
   whatsappOptInAt?: string | null;
+  whatsappMarketingOptIn: boolean;
   occupation?: string | null;
   city?: string | null;
   governorate?: string | null;
@@ -41,6 +42,7 @@ interface PatientForm {
   phone: string;
   whatsappPhone: string;
   whatsappOptIn: boolean;
+  whatsappMarketingOptIn: boolean;
   occupation: string;
   city: string;
   governorate: string;
@@ -65,6 +67,7 @@ function toFormValues(patient: Patient): PatientForm {
     phone: patient.phone || '',
     whatsappPhone: patient.whatsappPhone || '',
     whatsappOptIn: patient.whatsappOptIn,
+    whatsappMarketingOptIn: patient.whatsappMarketingOptIn,
     occupation: patient.occupation || '',
     city: patient.city || '',
     governorate: patient.governorate || '',
@@ -137,6 +140,8 @@ export default function EditPatientPage({ params }: { params: { id: string } }) 
           whatsappPhone: formValues.whatsappPhone || undefined,
           whatsappOptIn: formValues.whatsappOptIn,
           whatsappOptInAt: formValues.whatsappOptIn ? new Date().toISOString() : undefined,
+          whatsappMarketingOptIn: formValues.whatsappMarketingOptIn,
+          whatsappMarketingOptInAt: formValues.whatsappMarketingOptIn ? new Date().toISOString() : undefined,
           email: formValues.email || undefined,
           address: formValues.address || undefined,
           emergencyContactName: formValues.emergencyContactName || undefined,
@@ -169,6 +174,7 @@ export default function EditPatientPage({ params }: { params: { id: string } }) 
             <label className="grid gap-1 text-sm font-medium text-slate-700">Phone<input value={formValues.phone} onChange={(event) => updateField('phone', event.target.value)} maxLength={30} className="rounded border p-2 font-normal" /></label>
             <label className="grid gap-1 text-sm font-medium text-slate-700">WhatsApp number<input value={formValues.whatsappPhone} onChange={(event) => updateField('whatsappPhone', event.target.value)} maxLength={30} placeholder="مثال: +2010…" className="rounded border p-2 font-normal" /></label>
             <label className="flex items-start gap-2 rounded border border-[#bfe6e1] bg-[#f0fbf9] p-3 text-sm text-[#176763] sm:col-span-2"><input type="checkbox" checked={formValues.whatsappOptIn} onChange={(event) => updateField('whatsappOptIn', event.target.checked)} className="mt-1" /><span>وافق المريض صراحةً على استقبال تذكيرات المواعيد عبر WhatsApp.</span></label>
+            <label className="flex items-start gap-2 rounded border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950 sm:col-span-2"><input type="checkbox" checked={formValues.whatsappMarketingOptIn} onChange={(event) => updateField('whatsappMarketingOptIn', event.target.checked)} className="mt-1" /><span>وافق المريض صراحةً على استقبال العروض والتواصل التسويقي عبر WhatsApp. هذه الموافقة منفصلة عن تذكيرات المواعيد.</span></label>
             <label className="grid gap-1 text-sm font-medium text-slate-700">Gender<select value={formValues.gender} onChange={(event) => updateField('gender', event.target.value)} className="rounded border p-2 font-normal"><option value="">Not recorded</option><option value="female">Female</option><option value="male">Male</option></select></label>
             <label className="grid gap-1 text-sm font-medium text-slate-700">Marital status<select value={formValues.maritalStatus} onChange={(event) => updateField('maritalStatus', event.target.value)} className="rounded border p-2 font-normal"><option value="">Not recorded</option><option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option><option value="widowed">Widowed</option><option value="other">Other</option></select></label>
             <label className="grid gap-1 text-sm font-medium text-slate-700">Email<input type="email" value={formValues.email} onChange={(event) => updateField('email', event.target.value)} maxLength={254} className="rounded border p-2 font-normal" /></label>

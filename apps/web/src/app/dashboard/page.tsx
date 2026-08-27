@@ -129,6 +129,7 @@ export default function DashboardPage() {
               {owner && <Action href="/team" title="فريق العيادة" text="أضف أعضاء الفريق وحدد دور كل شخص." tone="teal" />}
               {owner && <Action href="/settings" title="إعدادات العيادة" text="اضبط اسم العيادة وبيانات التشغيل والطباعة." />}
               {owner && <Action href="/settings/subscription" title="الاشتراك والفوترة" text="راجع خطتك وحدود الاستخدام وطلبات التفعيل." tone="teal" />}
+              {owner && <Action href="/campaigns" title="عروض WhatsApp" text="أنشئ عرضًا للمرضى الموافقين وراجعه قبل الإرسال." tone="teal" />}
               {doctor && <Action href="/patients" title="الوصفة الإلكترونية" text="افتح ملف المريض ثم أنشئ وصفة قابلة للطباعة." tone="teal" />}
             </div>
           </div>

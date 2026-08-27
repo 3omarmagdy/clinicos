@@ -292,7 +292,8 @@ export class AuthService {
       ['organization:read', 'organization'], ['organization:update', 'organization'], ['audit:read', 'audit'],
       ['user:create', 'user'], ['user:read', 'user'], ['user:update', 'user'], ['user:delete', 'user'],
       ['patient:read', 'patient'], ['patient:create', 'patient'], ['patient:update', 'patient'],
-      ['marketing:export', 'marketing'], ['clinical_record:read', 'clinical_record'], ['clinical_record:create', 'clinical_record'], ['clinical_record:update', 'clinical_record'],
+            ['marketing:export', 'marketing'], ['marketing:send', 'marketing'], ['clinical_record:read', 'clinical_record'],
+ ['clinical_record:create', 'clinical_record'], ['clinical_record:update', 'clinical_record'],
       ['appointment:read', 'appointment'], ['appointment:create', 'appointment'], ['appointment:update', 'appointment'],
     ] as const;
 

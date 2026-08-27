@@ -1,0 +1,229 @@
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import type { CreateMarketingCampaignDto, MarketingCampaignFiltersDto, SendMarketingCampaignDto } from './marketing.dto';
+
+type ProviderResponse = { ok: boolean; status: number; json(): Promise<unknown> };
+type DeliveryResult = { recipientId: string; patientId: string; status: 'sent' | 'failed' | 'skipped'; reason?: string; messageId?: string };
+
+@Injectable()
+export class WhatsAppMarketingService {
+  private readonly logger = new Logger('WhatsAppMarketingService');
+
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+
+  async list(organizationId: string) {
+    return this.prisma.marketingCampaign.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true, templateName: true, offerText: true, expiresAt: true, status: true,
+        createdAt: true, startedAt: true, completedAt: true,
+        _count: { select: { recipients: true } },
+        recipients: { where: { status: 'SENT' }, select: { id: true } },
+      },
+    });
+  }
+
+  async preview(organizationId: string, filters: MarketingCampaignFiltersDto) {
+    const patients = await this.prisma.patient.findMany({
+      where: this.audienceWhere(organizationId, filters),
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      take: 10,
+      select: { id: true, firstName: true, lastName: true, whatsappPhone: true, phone: true },
+    });
+    const total = await this.prisma.patient.count({ where: this.audienceWhere(organizationId, filters) });
+    return { total, samples: patients.map((patient) => ({ id: patient.id, name: `${patient.firstName} ${patient.lastName}`.trim(), hasWhatsappNumber: Boolean(patient.whatsappPhone || patient.phone) })) };
+  }
+
+  async create(organizationId: string, actorId: string, data: CreateMarketingCampaignDto) {
+    const config = this.configuration();
+    if (!config) throw new BadRequestException('WhatsApp marketing template is not configured or approved yet');
+
+    const where = this.audienceWhere(organizationId, data);
+    const eligiblePatients = await this.prisma.patient.findMany({
+      where,
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      take: 1001,
+      select: { id: true },
+    });
+    if (eligiblePatients.length > 1000) throw new BadRequestException('Campaign is limited to 1000 recipients per batch');
+    if (!eligiblePatients.length) throw new BadRequestException('No active patients with WhatsApp marketing consent match these filters');
+
+    const campaign = await this.prisma.marketingCampaign.create({
+      data: {
+        organizationId,
+        createdById: actorId,
+        templateName: config.template,
+        offerText: data.offerText.trim(),
+        expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
+        recipients: {
+          create: eligiblePatients.map(({ id: patientId }) => ({ patientId, dedupeKey: `${organizationId}:${config.template}:${patientId}:${Date.now()}` })),
+        },
+      },
+      select: { id: true, templateName: true, offerText: true, expiresAt: true, status: true, createdAt: true },
+    });
+
+    await this.audit.log({
+      organizationId,
+      actorId,
+      action: 'whatsapp_marketing.campaign_created',
+      entityType: 'marketing_campaign',
+      entityId: campaign.id,
+      summary: `Created WhatsApp marketing campaign for ${eligiblePatients.length} consented recipients`,
+      metadata: { recipientCount: eligiblePatients.length, templateName: config.template },
+    });
+    return { ...campaign, recipientCount: eligiblePatients.length };
+  }
+
+  async send(organizationId: string, actorId: string, campaignId: string, data: SendMarketingCampaignDto) {
+    if (!data.confirm) throw new BadRequestException('Explicit confirmation is required before sending');
+    const config = this.configuration();
+    if (!config) throw new BadRequestException('WhatsApp marketing template is not configured or approved yet');
+
+    const campaign = await this.prisma.marketingCampaign.findFirst({
+      where: { id: campaignId, organizationId },
+      include: {
+        recipients: { where: { status: 'PENDING' }, take: data.maxRecipients ?? 100, orderBy: { createdAt: 'asc' }, include: { patient: true } },
+        organization: { select: { name: true, subscriptionPlan: true } },
+      },
+    });
+    if (!campaign) throw new NotFoundException('Campaign not found');
+    if (campaign.status === 'COMPLETED') throw new BadRequestException('Campaign has already completed');
+
+    const planLimit = this.monthlyLimitForPlan(campaign.organization.subscriptionPlan);
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const [reminderUsage, marketingUsage] = await Promise.all([
+      this.prisma.appointment.count({ where: { organizationId, whatsappReminderSentAt: { gte: monthStart } } }),
+      this.prisma.marketingCampaignRecipient.count({ where: { campaign: { organizationId }, status: 'SENT', sentAt: { gte: monthStart } } }),
+    ]);
+    const usedThisMonth = reminderUsage + marketingUsage;
+    if (planLimit === 0) throw new BadRequestException('WhatsApp is not included in the current plan');
+    if (planLimit !== null && usedThisMonth >= planLimit) throw new BadRequestException('Monthly WhatsApp message limit reached');
+    const available = planLimit === null ? campaign.recipients.length : Math.min(campaign.recipients.length, planLimit - usedThisMonth);
+    const recipients = campaign.recipients.slice(0, available);
+
+    await this.prisma.marketingCampaign.update({ where: { id: campaign.id }, data: { status: 'SENDING', startedAt: campaign.startedAt ?? new Date() } });
+    const results: DeliveryResult[] = [];
+    for (const recipient of recipients) results.push(await this.sendRecipient({ ...campaign, organizationName: campaign.organization.name }, recipient, config));
+
+    const pending = await this.prisma.marketingCampaignRecipient.count({ where: { campaignId: campaign.id, status: 'PENDING' } });
+    const sent = results.filter((result) => result.status === 'sent').length;
+    const failed = results.filter((result) => result.status === 'failed').length;
+    const completed = pending === 0;
+    await this.prisma.marketingCampaign.update({ where: { id: campaign.id }, data: { status: completed ? 'COMPLETED' : 'DRAFT', completedAt: completed ? new Date() : null } });
+    await this.audit.log({
+      organizationId,
+      actorId,
+      action: 'whatsapp_marketing.campaign_batch_sent',
+      entityType: 'marketing_campaign',
+      entityId: campaign.id,
+      summary: `Processed WhatsApp marketing batch: ${sent} sent, ${failed} failed`,
+      metadata: { attempted: results.length, sent, failed, pending, completed },
+    });
+    return { campaignId: campaign.id, status: completed ? 'COMPLETED' : 'DRAFT', sent, failed, pending, results };
+  }
+
+  private async sendRecipient(
+    campaign: { id: string; organizationId: string; organizationName: string; offerText: string; expiresAt: Date | null },
+    recipient: { id: string; patientId: string; patient: { firstName: string; whatsappPhone: string | null; phone: string | null } },
+    config: { accessToken: string; phoneNumberId: string; template: string; language: string; apiVersion: string },
+  ): Promise<DeliveryResult> {
+    const to = this.normalizePhone(recipient.patient.whatsappPhone || recipient.patient.phone);
+    if (!to) {
+      await this.prisma.marketingCampaignRecipient.update({ where: { id: recipient.id }, data: { status: 'SKIPPED', failureReason: 'missing_or_invalid_phone' } });
+      return { recipientId: recipient.id, patientId: recipient.patientId, status: 'skipped', reason: 'missing_or_invalid_phone' };
+    }
+
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'template',
+      template: {
+        name: config.template,
+        language: { code: config.language },
+        components: [{ type: 'body', parameters: [
+          { type: 'text', text: recipient.patient.firstName },
+          { type: 'text', text: campaign.organizationName },
+          { type: 'text', text: campaign.offerText },
+          { type: 'text', text: campaign.expiresAt ? new Intl.DateTimeFormat('ar-EG', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(campaign.expiresAt) : 'حتى نفاد الكمية' },
+        ] }],
+      },
+    };
+
+    try {
+      const response = await fetch(`https://graph.facebook.com/${config.apiVersion}/${config.phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${config.accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }) as unknown as ProviderResponse;
+      const responseBody = await response.json() as { messages?: Array<{ id?: string }>; error?: { message?: string } };
+      if (!response.ok) {
+        this.logger.error(`WhatsApp marketing delivery failed for recipient ${recipient.id}: ${response.status} ${responseBody.error?.message || 'unknown error'}`);
+        await this.prisma.marketingCampaignRecipient.update({ where: { id: recipient.id }, data: { status: 'FAILED', failureReason: 'provider_rejected_message' } });
+        return { recipientId: recipient.id, patientId: recipient.patientId, status: 'failed', reason: 'provider_rejected_message' };
+      }
+      const messageId = responseBody.messages?.[0]?.id;
+      await this.prisma.marketingCampaignRecipient.update({ where: { id: recipient.id }, data: { status: 'SENT', providerMessageId: messageId, sentAt: new Date() } });
+      return { recipientId: recipient.id, patientId: recipient.patientId, status: 'sent', messageId };
+    } catch (error) {
+      this.logger.error(`WhatsApp marketing request failed for recipient ${recipient.id}: ${error instanceof Error ? error.message : 'unknown error'}`);
+      await this.prisma.marketingCampaignRecipient.update({ where: { id: recipient.id }, data: { status: 'FAILED', failureReason: 'provider_request_failed' } });
+      return { recipientId: recipient.id, patientId: recipient.patientId, status: 'failed', reason: 'provider_request_failed' };
+    }
+  }
+
+  private audienceWhere(organizationId: string, filters: MarketingCampaignFiltersDto): Prisma.PatientWhereInput {
+    const where: Prisma.PatientWhereInput = {
+      organizationId,
+      status: 'active',
+      marketingConsent: true,
+      whatsappMarketingOptIn: true,
+      OR: [{ whatsappPhone: { not: null } }, { phone: { not: null } }],
+      ...(filters.governorate ? { governorate: filters.governorate.trim() } : {}),
+      ...(filters.city ? { city: filters.city.trim() } : {}),
+      ...(filters.gender ? { gender: filters.gender.trim() } : {}),
+      ...(filters.leadSource ? { leadSource: filters.leadSource.trim() } : {}),
+    };
+    if (filters.minAge !== undefined || filters.maxAge !== undefined) {
+      const today = new Date();
+      const range: Prisma.DateTimeNullableFilter = {};
+      if (filters.minAge !== undefined) range.lte = new Date(today.getFullYear() - filters.minAge, today.getMonth(), today.getDate());
+      if (filters.maxAge !== undefined) range.gte = new Date(today.getFullYear() - filters.maxAge - 1, today.getMonth(), today.getDate());
+      where.dateOfBirth = range;
+    }
+    return where;
+  }
+
+  private monthlyLimitForPlan(plan: string): number | null {
+    const normalized = plan.toUpperCase();
+    if (normalized === 'STARTER') return 100;
+    if (normalized === 'PROFESSIONAL') return 300;
+    if (normalized === 'CLINIC') return 1000;
+    if (normalized === 'CENTER' || normalized === 'ENTERPRISE') return null;
+    return 0;
+  }
+
+  private configuration() {
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const template = process.env.WHATSAPP_MARKETING_TEMPLATE;
+    if (!accessToken || !phoneNumberId || !template) return null;
+    return { accessToken, phoneNumberId, template, language: process.env.WHATSAPP_MARKETING_TEMPLATE_LANGUAGE || process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'ar', apiVersion: process.env.WHATSAPP_API_VERSION || 'v26.0' };
+  }
+
+  private normalizePhone(value?: string | null): string | null {
+    if (!value) return null;
+    const raw = value.trim();
+    const digits = raw.replace(/\D/g, '');
+    if (raw.startsWith('+') && /^\+\d{10,15}$/.test(raw.replace(/[\s()-]/g, ''))) return raw.replace(/[\s()-]/g, '');
+    if (digits.startsWith('20') && digits.length === 12) return `+${digits}`;
+    if (digits.startsWith('01') && digits.length === 11) return `+20${digits.slice(1)}`;
+    return null;
+  }
+}
