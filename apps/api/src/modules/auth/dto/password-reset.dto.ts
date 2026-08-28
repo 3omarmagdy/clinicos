@@ -17,7 +17,7 @@ export class ResetPasswordDto {
   token!: string;
 
   @IsString()
-  @MinLength(10)
+  @MinLength(6)
   @MaxLength(128)
   @Matches(/(?=.*[A-Za-z])(?=.*\d)/, { message: 'Password must include at least one letter and one number' })
   password!: string;

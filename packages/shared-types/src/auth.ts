@@ -21,6 +21,7 @@ export interface JwtPayload {
   role: string;
   permissions: string[];
   isPlatformAdmin: boolean;
+  sessionVersion: number;
   iat?: number;
   exp?: number;
 }

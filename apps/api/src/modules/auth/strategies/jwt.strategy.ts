@@ -5,11 +5,23 @@ import { ConfigService } from '@nestjs/config';
 import type { JwtPayload, AuthContext } from '@clinicos/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 
+const cookieToken = (request: { headers?: { cookie?: string } }): string | null => {
+  const cookie = request.headers?.cookie;
+  if (!cookie) return null;
+  const entry = cookie.split(';').map((item) => item.trim()).find((item) => item.startsWith('clinicos_auth='));
+  if (!entry) return null;
+  try {
+    return decodeURIComponent(entry.slice('clinicos_auth='.length));
+  } catch {
+    return null;
+  }
+};
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(configService: ConfigService, private readonly prisma: PrismaService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([cookieToken, ExtractJwt.fromAuthHeaderAsBearerToken()]),
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
     });
@@ -25,6 +37,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         role: true,
         status: true,
         isPlatformAdmin: true,
+        sessionVersion: true,
         userRoles: {
           select: {
             role: {
@@ -39,7 +52,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       },
     });
 
-    if (!user || user.status !== 'active' || user.organizationId !== payload.organizationId) {
+    if (!user || user.status !== 'active' || user.organizationId !== payload.organizationId || user.sessionVersion !== payload.sessionVersion) {
       throw new UnauthorizedException('Your session is no longer active');
     }
 

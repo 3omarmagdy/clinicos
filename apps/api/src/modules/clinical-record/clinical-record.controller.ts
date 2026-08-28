@@ -21,6 +21,11 @@ export class ClinicalRecordController {
     return this.records.get(patientId, recordId, req.user.organizationId);
   }
 
+  @Get(':recordId/revisions') @RequirePermissions('clinical_record:read')
+  revisions(@Param('patientId') patientId: string, @Param('recordId') recordId: string, @Req() req: { user: AuthContext }) {
+    return this.records.revisions(patientId, recordId, req.user.organizationId);
+  }
+
   @Post() @RequirePermissions('clinical_record:create')
   create(@Param('patientId') patientId: string, @Body() data: CreateClinicalRecordDto, @Req() req: { user: AuthContext }) {
     return this.records.create(patientId, req.user.organizationId, req.user.userId, data);
@@ -28,6 +33,6 @@ export class ClinicalRecordController {
 
   @Patch(':recordId') @RequirePermissions('clinical_record:update')
   update(@Param('patientId') patientId: string, @Param('recordId') recordId: string, @Body() data: UpdateClinicalRecordDto, @Req() req: { user: AuthContext }) {
-    return this.records.update(patientId, recordId, req.user.organizationId, data);
+    return this.records.update(patientId, recordId, req.user.organizationId, data, req.user.userId, req.user.role);
   }
 }

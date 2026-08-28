@@ -1,60 +1,67 @@
-const ACCESS_TOKEN_KEY = 'clinicos.accessToken';
+const SESSION_COOKIE = 'clinicos_session';
+
+type SessionHint = { permissions?: string[]; isPlatformAdmin?: boolean };
+
+function readCookie(name: string): string | null {
+  if (typeof window === 'undefined') return null;
+  const entry = document.cookie.split(';').map((item) => item.trim()).find((item) => item.startsWith(`${name}=`));
+  if (!entry) return null;
+  try {
+    return decodeURIComponent(entry.slice(name.length + 1));
+  } catch {
+    return null;
+  }
+}
+
+function sessionHint(): SessionHint | null {
+  const encoded = readCookie(SESSION_COOKIE);
+  if (!encoded) return null;
+  try {
+    const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(window.atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='))) as SessionHint;
+  } catch {
+    return null;
+  }
+}
 
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(ACCESS_TOKEN_KEY);
+  // Remove browser-readable tokens saved by older app versions.
+  window.localStorage.removeItem('clinicos.accessToken');
+  window.localStorage.removeItem('token');
+  return readCookie(SESSION_COOKIE) ? 'cookie-session' : null;
 }
 
-export function setAccessToken(accessToken: string): void {
-  window.localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  // Remove the legacy key so a stale token cannot be used by an older page.
+export function setAccessToken(): void {
+  if (typeof window === 'undefined') return;
+  // The real session is an HttpOnly cookie created by the API.
+  window.localStorage.removeItem('clinicos.accessToken');
   window.localStorage.removeItem('token');
 }
 
 export function clearAccessToken(): void {
-  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem('clinicos.accessToken');
   window.localStorage.removeItem('token');
+  document.cookie = `${SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
 export function signOut(): void {
-  // Clinico stores only client-side session state in local storage. Clearing it
-  // all avoids stale sessions after a schema or permission update.
-  window.localStorage.clear();
-  window.location.replace('/login?loggedOut=1');
+  if (typeof window === 'undefined') return;
+  void fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => {
+    clearAccessToken();
+    window.location.replace('/login?loggedOut=1');
+  });
 }
 
 export async function authenticatedFetch(path: string, init: Parameters<typeof fetch>[1] = {}): Promise<Response> {
-  const accessToken = getAccessToken();
-  const headers = new Headers(init.headers);
-
-  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-
-  return fetch(path, { ...init, headers });
+  return fetch(path, { ...init, credentials: 'same-origin' });
 }
 
 export function hasSessionPermission(permission: string): boolean {
-  const accessToken = getAccessToken();
-  if (!accessToken) return false;
-
-  try {
-    const payload = accessToken.split('.')[1];
-    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const decoded = JSON.parse(window.atob(normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=')));
-    return Array.isArray(decoded.permissions) && decoded.permissions.includes(permission);
-  } catch {
-    return false;
-  }
+  return sessionHint()?.permissions?.includes(permission) === true;
 }
 
 export function isPlatformAdminSession(): boolean {
-  const accessToken = getAccessToken();
-  if (!accessToken) return false;
-  try {
-    const payload = accessToken.split('.')[1];
-    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const decoded = JSON.parse(window.atob(normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=')));
-    return decoded.isPlatformAdmin === true;
-  } catch {
-    return false;
-  }
+  return sessionHint()?.isPlatformAdmin === true;
 }

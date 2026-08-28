@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { User } from '@clinicos/shared-types';
 import type { CreateTeamMemberDto } from './user.dto';
@@ -120,11 +120,15 @@ export class UserService {
     return this.toUser(user);
   }
 
-  async setTeamMemberPassword(organizationId: string, userId: string, password: string, actorId?: string): Promise<void> {
+  async setTeamMemberPassword(organizationId: string, userId: string, password: string, actorId: string, actorRole: string): Promise<void> {
     await this.subscriptions.assertCanWrite(organizationId);
     const member = await this.prisma.user.findFirst({ where: { id: userId, organizationId }, select: { id: true, role: true } });
     if (!member) throw new NotFoundException('Team member not found in this clinic');
-    await this.prisma.user.update({ where: { id: member.id }, data: { passwordHash: await bcrypt.hash(password, 12) } });
+    const rank: Record<string, number> = { receptionist: 1, doctor: 1, admin: 2, owner: 3 };
+    if ((rank[member.role] ?? 1) >= (rank[actorRole] ?? 0) && member.id !== actorId) {
+      throw new ForbiddenException('You cannot reset the password of a user with equal or higher access');
+    }
+    await this.prisma.user.update({ where: { id: member.id }, data: { passwordHash: await bcrypt.hash(password, 12), sessionVersion: { increment: 1 } } });
     await this.audit.log({ organizationId, actorId, action: 'team_member.password_reset', entityType: 'user', entityId: member.id, summary: `Reset ${member.role} team member password` });
   }
 }

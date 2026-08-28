@@ -37,6 +37,7 @@ model Organization {
   roles                    Role[]
   patients                 Patient[]
   clinicalRecords          ClinicalRecord[]
+  clinicalRecordRevisions  ClinicalRecordRevision[]
   appointments             Appointment[]
   visits                   Visit[]
   marketingCampaigns       MarketingCampaign[]
@@ -210,6 +211,7 @@ model Patient {
 
   organization                Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   clinicalRecords             ClinicalRecord[]
+  clinicalRecordRevisions     ClinicalRecordRevision[]
   appointments                Appointment[]
   visits                      Visit[]
   marketingCampaignRecipients MarketingCampaignRecipient[]
@@ -423,10 +425,35 @@ model ClinicalRecord {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
   author       User         @relation("ClinicalRecordAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  revisions    ClinicalRecordRevision[]
 
   @@index([organizationId, patientId, createdAt])
   @@index([organizationId, id])
   @@map("clinical_records")
+}
+
+/// Immutable snapshots taken immediately before a clinical record is amended.
+/// This preserves clinical accountability without exposing note content in the
+/// general-purpose audit log.
+model ClinicalRecordRevision {
+  id               String   @id @default(cuid())
+  clinicalRecordId String
+  organizationId   String
+  patientId        String
+  revisionNumber   Int
+  snapshot         Json
+  changedFields    String[]
+  changedById      String
+  createdAt        DateTime @default(now())
+
+  clinicalRecord ClinicalRecord @relation(fields: [clinicalRecordId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patient        Patient        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  changedBy      User           @relation("ClinicalRecordRevisionActor", fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@unique([clinicalRecordId, revisionNumber])
+  @@index([organizationId, patientId, createdAt])
+  @@map("clinical_record_revisions")
 }
 
 // ============================================================================
@@ -494,6 +521,7 @@ model User {
   role            String    @default("receptionist") // owner | admin | doctor | receptionist | nurse | accountant | custom
   status          String    @default("active") // active | inactive | suspended
   isPlatformAdmin Boolean   @default(false)
+  sessionVersion   Int       @default(0)
   lastLoginAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -502,6 +530,7 @@ model User {
   organization              Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userRoles                 UserRole[]
   authoredClinicalRecords   ClinicalRecord[]          @relation("ClinicalRecordAuthor")
+  clinicalRecordRevisions   ClinicalRecordRevision[]  @relation("ClinicalRecordRevisionActor")
   createdAppointments       Appointment[]             @relation("AppointmentCreator")
   assignedAppointments      Appointment[]             @relation("AppointmentDoctor")
   doctorVisits              Visit[]                   @relation("VisitDoctor")
