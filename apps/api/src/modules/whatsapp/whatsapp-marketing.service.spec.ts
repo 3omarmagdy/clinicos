@@ -36,6 +36,7 @@ describe('WhatsAppMarketingService', () => {
   });
 
   it('sends one approved marketing template and records its provider id', async () => {
+    process.env.WHATSAPP_SEND_ENABLED = 'true';
     process.env.WHATSAPP_ACCESS_TOKEN = 'test-token';
     process.env.WHATSAPP_PHONE_NUMBER_ID = 'phone-number-id';
     process.env.WHATSAPP_MARKETING_TEMPLATE = 'clinic_offer_v1';
@@ -52,6 +53,10 @@ describe('WhatsAppMarketingService', () => {
       },
       marketingCampaignRecipient: {
         count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(0),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      whatsAppMessage: {
+        create: jest.fn().mockResolvedValue({ id: 'message-1' }),
         update: jest.fn().mockResolvedValue({}),
       },
     };
@@ -85,6 +90,7 @@ describe('WhatsAppMarketingService', () => {
   });
 
   it('blocks Starter after its marketing quota is exhausted', async () => {
+    process.env.WHATSAPP_SEND_ENABLED = 'true';
     process.env.WHATSAPP_ACCESS_TOKEN = 'test-token';
     process.env.WHATSAPP_PHONE_NUMBER_ID = 'phone-number-id';
     process.env.WHATSAPP_MARKETING_TEMPLATE = 'clinic_offer_v1';

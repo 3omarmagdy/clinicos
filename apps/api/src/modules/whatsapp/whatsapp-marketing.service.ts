@@ -52,8 +52,8 @@ export class WhatsAppMarketingService {
 
   async create(organizationId: string, actorId: string, data: CreateMarketingCampaignDto) {
     await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
-    const config = this.configuration();
-    if (!config) throw new BadRequestException('WhatsApp marketing template is not configured or approved yet');
+    const config = this.configuration(false);
+    if (!config) throw new BadRequestException('WhatsApp marketing template is not configured yet');
 
     const where = this.audienceWhere(organizationId, data);
     const eligiblePatients = await this.prisma.patient.findMany({
@@ -95,8 +95,8 @@ export class WhatsAppMarketingService {
     if (!data.confirm) throw new BadRequestException('Explicit confirmation is required before sending');
     await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
     await this.quotaGuard.assertNotBlocked(organizationId, actorId, 'marketing');
-    const config = this.configuration();
-    if (!config) throw new BadRequestException('WhatsApp marketing template is not configured or approved yet');
+    const config = this.configuration(true);
+    if (!config) throw new BadRequestException('WhatsApp marketing sending is disabled or the template is not configured/approved yet');
 
     const campaign = await this.prisma.marketingCampaign.findFirst({
       where: { id: campaignId, organizationId },
@@ -167,6 +167,15 @@ export class WhatsAppMarketingService {
       return { recipientId: recipient.id, patientId: recipient.patientId, status: 'skipped', reason: 'missing_or_invalid_phone' };
     }
 
+    let message: { id: string };
+    try {
+      message = await this.prisma.whatsAppMessage.create({ data: { organizationId: campaign.organizationId, patientId: recipient.patientId, campaignRecipientId: recipient.id, category: 'marketing', status: 'QUEUED', templateName: config.template } });
+    } catch (error) {
+      this.logger.error(`WhatsApp message audit record failed for recipient ${recipient.id}: ${error instanceof Error ? error.message : 'unknown error'}`);
+      await this.prisma.marketingCampaignRecipient.update({ where: { id: recipient.id }, data: { status: 'FAILED', failureReason: 'message_log_failed' } });
+      return { recipientId: recipient.id, patientId: recipient.patientId, status: 'failed', reason: 'message_log_failed' };
+    }
+
     const payload = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -193,14 +202,23 @@ export class WhatsAppMarketingService {
       const responseBody = await response.json() as { messages?: Array<{ id?: string }>; error?: { message?: string } };
       if (!response.ok) {
         this.logger.error(`WhatsApp marketing delivery failed for recipient ${recipient.id}: ${response.status} ${responseBody.error?.message || 'unknown error'}`);
+        await this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'FAILED', failureReason: 'provider_rejected_message', failedAt: new Date() } });
         await this.prisma.marketingCampaignRecipient.update({ where: { id: recipient.id }, data: { status: 'FAILED', failureReason: 'provider_rejected_message' } });
         return { recipientId: recipient.id, patientId: recipient.patientId, status: 'failed', reason: 'provider_rejected_message' };
       }
       const messageId = responseBody.messages?.[0]?.id;
-      await this.prisma.marketingCampaignRecipient.update({ where: { id: recipient.id }, data: { status: 'SENT', providerMessageId: messageId, sentAt: new Date() } });
+      if (!messageId) {
+        await this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'FAILED', failureReason: 'provider_missing_message_id', failedAt: new Date() } });
+        await this.prisma.marketingCampaignRecipient.update({ where: { id: recipient.id }, data: { status: 'FAILED', failureReason: 'provider_missing_message_id' } });
+        return { recipientId: recipient.id, patientId: recipient.patientId, status: 'failed', reason: 'provider_missing_message_id' };
+      }
+      const sentAt = new Date();
+      await this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'SENT', providerMessageId: messageId, sentAt } });
+      await this.prisma.marketingCampaignRecipient.update({ where: { id: recipient.id }, data: { status: 'SENT', providerMessageId: messageId, sentAt } });
       return { recipientId: recipient.id, patientId: recipient.patientId, status: 'sent', messageId };
     } catch (error) {
       this.logger.error(`WhatsApp marketing request failed for recipient ${recipient.id}: ${error instanceof Error ? error.message : 'unknown error'}`);
+      await this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'FAILED', failureReason: 'provider_request_failed', failedAt: new Date() } });
       await this.prisma.marketingCampaignRecipient.update({ where: { id: recipient.id }, data: { status: 'FAILED', failureReason: 'provider_request_failed' } });
       return { recipientId: recipient.id, patientId: recipient.patientId, status: 'failed', reason: 'provider_request_failed' };
     }
@@ -238,11 +256,11 @@ export class WhatsAppMarketingService {
     return PLAN_CATALOG[normalized]?.whatsappMarketingMessages ?? 0;
   }
 
-  private configuration() {
+  private configuration(requireEnabled = false) {
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     const template = process.env.WHATSAPP_MARKETING_TEMPLATE;
-    if (!accessToken || !phoneNumberId || !template) return null;
+    if (!accessToken || !phoneNumberId || !template || (requireEnabled && process.env.WHATSAPP_SEND_ENABLED !== 'true')) return null;
     return { accessToken, phoneNumberId, template, language: process.env.WHATSAPP_MARKETING_TEMPLATE_LANGUAGE || process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'ar', apiVersion: process.env.WHATSAPP_API_VERSION || 'v26.0' };
   }
 

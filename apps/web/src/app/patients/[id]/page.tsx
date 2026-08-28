@@ -14,6 +14,9 @@ type Patient = {
   admittedAt: string;
   gender?: string | null;
   phone?: string | null;
+  whatsappPhone?: string | null;
+  whatsappOptIn?: boolean;
+  whatsappMarketingOptIn?: boolean;
   occupation?: string | null;
   city?: string | null;
   governorate?: string | null;
@@ -81,6 +84,8 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
   const [loading, setLoading] = useState(true);
   const [clinicalLoading, setClinicalLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [whatsappSaving, setWhatsappSaving] = useState(false);
+  const [whatsappNotice, setWhatsappNotice] = useState('');
   const [form, setForm] = useState(blankRecord);
 
   const canUpdate = hasSessionPermission('patient:update');
@@ -130,6 +135,22 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function disableWhatsApp() {
+    if (!window.confirm('هل تريد إيقاف جميع رسائل WhatsApp لهذا المريض؟')) return;
+    setWhatsappSaving(true);
+    setWhatsappNotice('');
+    try {
+      const response = await authenticatedFetch(`/api/v1/patients/${params.id}/whatsapp-opt-out`, { method: 'POST' });
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, 'تعذر إيقاف رسائل WhatsApp.'));
+      setWhatsappNotice('تم إيقاف تذكيرات المواعيد والعروض لهذا المريض.');
+      await load();
+    } catch (reason) {
+      setWhatsappNotice(reason instanceof Error ? reason.message : 'تعذر إيقاف الرسائل.');
+    } finally {
+      setWhatsappSaving(false);
+    }
+  }
 
   async function saveRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -254,6 +275,17 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
                   ) : null}
                 </div>
               ) : null}
+
+              <div className="mt-5 border-t border-slate-100 pt-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-black text-[#153c63]">تفضيلات التواصل عبر WhatsApp</p>
+                    <p className="mt-1 text-sm text-slate-600">تذكيرات المواعيد: {patient.whatsappOptIn ? 'مفعّلة' : 'متوقفة'} · العروض: {patient.whatsappMarketingOptIn ? 'مفعّلة' : 'متوقفة'}</p>
+                  </div>
+                  {canUpdate && (patient.whatsappOptIn || patient.whatsappMarketingOptIn) ? <button type="button" onClick={() => void disableWhatsApp()} disabled={whatsappSaving} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 disabled:opacity-60">{whatsappSaving ? 'جارٍ الإيقاف…' : 'إيقاف كل رسائل WhatsApp'}</button> : null}
+                </div>
+                {whatsappNotice ? <p role="status" className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{whatsappNotice}</p> : null}
+              </div>
             </section>
 
             <section className="mt-6 rounded-3xl border border-[#dce7f1] bg-white p-6 shadow-sm sm:p-8">
