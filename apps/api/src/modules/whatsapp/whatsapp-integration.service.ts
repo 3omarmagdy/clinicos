@@ -46,6 +46,7 @@ export class WhatsAppIntegrationService {
 
   async upsert(organizationId: string, input: IntegrationInput): Promise<void> {
     if (!this.encryptionKey()) throw new BadRequestException('WhatsApp encryption key is not configured');
+    await this.validateWithMeta(input);
     const encrypted = this.encrypt(input.accessToken);
     const data = {
       phoneNumberId: input.phoneNumberId.trim(),
@@ -75,6 +76,17 @@ export class WhatsAppIntegrationService {
   async getByPhoneNumberId(phoneNumberId: string): Promise<WhatsAppIntegrationConfig | null> {
     const record = await this.prisma.whatsAppIntegration.findUnique({ where: { phoneNumberId } }) as IntegrationRecord | null;
     return record ? this.decryptRecord(record) : null;
+  }
+
+  private async validateWithMeta(input: IntegrationInput): Promise<void> {
+    const apiVersion = input.apiVersion?.trim() || 'v26.0';
+    try {
+      const response = await fetch(`https://graph.facebook.com/${apiVersion}/${encodeURIComponent(input.phoneNumberId.trim())}?fields=id,whatsapp_business_account`, { headers: { Authorization: `Bearer ${input.accessToken}` } });
+      const body = await response.json() as { id?: string; whatsapp_business_account?: { id?: string }; error?: { code?: number } };
+      if (!response.ok || body.id !== input.phoneNumberId.trim() || body.whatsapp_business_account?.id !== input.wabaId.trim()) throw new Error(`Meta validation failed${body.error?.code ? ` (${body.error.code})` : ''}`);
+    } catch {
+      throw new BadRequestException('تعذر التحقق من Phone Number ID وWABA ID وAccess Token عبر Meta. راجع بيانات الربط وصلاحيات Access Token.');
+    }
   }
 
   private decryptRecord(record: IntegrationRecord): WhatsAppIntegrationConfig {

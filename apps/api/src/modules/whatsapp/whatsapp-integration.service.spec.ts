@@ -6,6 +6,7 @@ describe('WhatsAppIntegrationService', () => {
 
   it('encrypts the clinic access token with separate IV/auth tag and returns safe summaries', async () => {
     process.env.WHATSAPP_ENCRYPTION_KEY = 'test-encryption-key-with-enough-entropy';
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ id: '123456789', whatsapp_business_account: { id: 'waba-123456' } }) }) as never;
     const upsert = jest.fn().mockResolvedValue({});
     const prisma = { whatsAppIntegration: { upsert, findUnique: jest.fn() } };
     const service = new WhatsAppIntegrationService(prisma as never);
@@ -14,6 +15,7 @@ describe('WhatsAppIntegrationService', () => {
       phoneNumberId: '123456789', wabaId: 'waba-123456', accessToken: 'access-token-secret', appointmentTemplate: 'clinic_appointment_reminder', marketingTemplate: 'clinic_offer_v1', enabled: false,
     });
 
+    expect(global.fetch).toHaveBeenCalledWith('https://graph.facebook.com/v26.0/123456789?fields=id,whatsapp_business_account', { headers: { Authorization: 'Bearer access-token-secret' } });
     const create = upsert.mock.calls[0][0].create;
     expect(create.accessTokenCiphertext).not.toContain('access-token-secret');
     expect(create.accessTokenIv).toEqual(expect.any(String));
