@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { authenticatedFetch, clearAccessToken, getAccessToken, hasSessionPermission, isPlatformAdminSession, signOut } from '@/lib/auth-session';
+import { WorkspaceShell } from '@/components/workspace-shell';
 
 type CurrentUser = { id: string; email: string; firstName: string; lastName: string; role: string; organizationId: string };
 type DashboardMetrics = { patients: number; consentedPatients: number; newPatientsThisMonth: number; todayAppointments: number; upcomingAppointments: number; todayByStatus: Record<string, number> };
@@ -83,9 +84,9 @@ export default function DashboardPage() {
   const fullName = `${user.firstName} ${user.lastName}`.trim();
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#f5f9fd] px-4 py-6 text-[#10233d] sm:px-6 sm:py-10">
-      <section className="mx-auto max-w-7xl">
-        <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#dce7f1] bg-white px-5 py-4 shadow-sm">
+    <WorkspaceShell name={fullName} role={user.role} onSignOut={signOut}>
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-8 sm:py-9">
+        <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#dce7f1] bg-white px-5 py-4 shadow-sm lg:hidden">
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#1768a8] text-sm font-black text-white">C</span>
             <div>
@@ -102,7 +103,7 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <section className="mt-6 rounded-[1.7rem] bg-[#12395e] px-6 py-8 text-white sm:px-9">
+        <section className="clinicos-grid mt-6 overflow-hidden rounded-[1.7rem] bg-[#0b1f33] px-6 py-8 text-white shadow-[0_28px_60px_-36px_rgba(11,31,51,.8)] sm:px-9">
           <p className="text-xs font-extrabold tracking-[.16em] text-[#7ee5de]">{copy.eyebrow}</p>
           <div className="mt-3 flex flex-wrap items-end justify-between gap-5">
             <div>
@@ -117,7 +118,7 @@ export default function DashboardPage() {
 
         {owner && <section className="mt-6 rounded-2xl border border-[#cde9e5] bg-[#f0fbf9] p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-extrabold text-[#087d78]">ابدأ بسرعة</p><h2 className="mt-1 text-lg font-extrabold">ثلاث خطوات لتشغيل عيادتك</h2></div><div className="flex flex-wrap gap-2 text-sm font-bold"><Link href="/team" className="rounded-lg bg-white px-3 py-2 text-[#176763] ring-1 ring-[#cde9e5]">1. أضف الفريق</Link><Link href="/patients/import" className="rounded-lg bg-white px-3 py-2 text-[#176763] ring-1 ring-[#cde9e5]">2. انقل بياناتك</Link><Link href="/appointments" className="rounded-lg bg-white px-3 py-2 text-[#176763] ring-1 ring-[#cde9e5]">3. ابدأ الحجوزات</Link></div></div></section>}
 
-        {metrics && <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Metric label="المرضى" title="إجمالي المرضى" value={formatNumber.format(metrics.patients)} /><Metric label="اليوم" title="مواعيد اليوم" value={formatNumber.format(metrics.todayAppointments)} /><Metric label="القادم" title="المواعيد خلال 7 أيام" value={formatNumber.format(metrics.upcomingAppointments)} /></section>}
+        {metrics && <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Metric label="PATIENTS" title="إجمالي المرضى" value={formatNumber.format(metrics.patients)} /><Metric label="TODAY" title="مواعيد اليوم" value={formatNumber.format(metrics.todayAppointments)} /><Metric label="UPCOMING" title="المواعيد خلال 7 أيام" value={formatNumber.format(metrics.upcomingAppointments)} /></section>}
 
         <section className="mt-6 grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
           <div className="rounded-2xl border border-[#dce7f1] bg-white p-6 shadow-sm">
@@ -149,12 +150,12 @@ export default function DashboardPage() {
 
         <footer className="mt-6 px-2 text-xs text-slate-500">تُعرض فقط البيانات والصلاحيات المرتبطة بدورك داخل هذه العيادة.</footer>
       </section>
-    </main>
+    </WorkspaceShell>
   );
 }
 
 function Metric({ label, title, value }: { label: string; title: string; value: string }) {
-  return <article className="rounded-2xl border border-[#dce7f1] bg-white p-5 shadow-sm"><p className="text-xs font-extrabold tracking-[.13em] text-[#1768a8]">{label}</p><p className="mt-2 text-sm font-bold text-slate-600">{title}</p><p dir="ltr" className="mt-2 text-3xl font-extrabold text-[#153c63]">{value}</p></article>;
+  return <article className="clinicos-card rounded-2xl p-5"><p className="text-[10px] font-extrabold tracking-[.16em] text-[#0a948d]">{label}</p><p className="mt-3 text-sm font-semibold text-slate-500">{title}</p><p dir="ltr" className="mt-2 text-3xl font-bold text-[#0b1f33]">{value}</p><span className="mt-4 block h-1.5 w-14 rounded-full bg-gradient-to-l from-[#10afa3] to-[#1268a6]" /></article>;
 }
 
 function Action({ href, title, text, primary, tone }: { href: string; title: string; text: string; primary?: boolean; tone?: 'teal' }) {
