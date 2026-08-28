@@ -232,6 +232,7 @@ model Patient {
 model MarketingCampaign {
   id             String    @id @default(cuid())
   organizationId String
+  serviceId      String?
   templateName   String
   offerText      String
   expiresAt      DateTime?
@@ -243,6 +244,7 @@ model MarketingCampaign {
   updatedAt      DateTime  @updatedAt
 
   organization Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  service      Service?                     @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   createdBy    User                         @relation(fields: [createdById], references: [id], onDelete: Restrict)
   recipients   MarketingCampaignRecipient[]
 
@@ -359,6 +361,7 @@ model Service {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   appointments Appointment[]
+  marketingCampaigns MarketingCampaign[]
 
   @@unique([organizationId, name])
   @@index([organizationId, specialty, isActive])
