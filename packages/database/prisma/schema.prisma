@@ -38,6 +38,7 @@ model Organization {
   users                    User[]
   roles                    Role[]
   patients                 Patient[]
+  services                 Service[]
   clinicalRecords          ClinicalRecord[]
   appointments             Appointment[]
   visits                   Visit[]
@@ -342,6 +343,29 @@ model MessagingQuotaViolation {
 }
 
 // ============================================================================
+// CLINIC SERVICES
+// ============================================================================
+
+model Service {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  specialty      String
+  durationMinutes Int         @default(30)
+  price          Int?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, specialty, isActive])
+  @@map("services")
+}
+
+// ============================================================================
 // APPOINTMENTS
 // ============================================================================
 
@@ -350,6 +374,7 @@ model Appointment {
   organizationId  String
   patientId       String
   createdById     String
+  serviceId       String?
   doctorId        String?
   scheduledAt     DateTime
   durationMinutes Int      @default(30)
@@ -361,6 +386,7 @@ model Appointment {
 
   organization              Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   patient                   Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  service                   Service?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   createdBy                 User              @relation("AppointmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
   doctor                    User?             @relation("AppointmentDoctor", fields: [doctorId], references: [id], onDelete: SetNull)
   visit                     Visit?
