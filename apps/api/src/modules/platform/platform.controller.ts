@@ -16,8 +16,8 @@ export class PlatformController {
   listOrganizations() { return this.platform.listOrganizations(); }
 
   @Patch('organizations/:id/subscription')
-  updateSubscription(@Param('id') id: string, @Body() data: UpdateSubscriptionDto) {
-    return this.platform.updateSubscription(id, data);
+  updateSubscription(@Param('id') id: string, @Body() data: UpdateSubscriptionDto, @Req() req: { user: AuthContext }) {
+    return this.platform.updateSubscription(id, data, req.user.userId);
   }
 
   @Get('payments/pending')

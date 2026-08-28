@@ -42,8 +42,12 @@ export class AuthService {
     private email: EmailService,
   ) {}
 
-  async login(credentials: LoginCredentials): Promise<AuthToken> {
-    const { email, password, organizationSlug } = credentials;
+  async login(credentials: LoginCredentials, clientIp = 'unknown'): Promise<AuthToken> {
+    const email = credentials.email.trim().toLowerCase();
+    const organizationSlug = credentials.organizationSlug.trim();
+    const { password } = credentials;
+    const failureKeyHash = this.hashCode(`login:${email}:${organizationSlug}:${clientIp}`);
+    await this.assertLoginRate(failureKeyHash);
 
     // Find user by email
     const user = await this.prisma.user.findFirst({
@@ -72,6 +76,7 @@ export class AuthService {
     });
 
     if (!user) {
+      await this.recordLoginFailure(failureKeyHash);
       this.logger.warn(`Login failed: user not found - ${email}`);
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -81,14 +86,26 @@ export class AuthService {
     // Check password
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatch) {
+      await this.recordLoginFailure(failureKeyHash);
       this.logger.warn(`Login failed: invalid password - ${email}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    await this.prisma.authLoginFailure.deleteMany({ where: { keyHash: failureKeyHash } });
     const token = this.issueToken(user);
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     this.logger.log(`User logged in: ${email}`);
     return token;
+  }
+
+  private async assertLoginRate(keyHash: string): Promise<void> {
+    const since = new Date(Date.now() - 10 * 60 * 1000);
+    const failures = await this.prisma.authLoginFailure.count({ where: { keyHash, createdAt: { gte: since } } });
+    if (failures >= 8) throw new UnauthorizedException('Too many login attempts. Try again later.');
+  }
+
+  private async recordLoginFailure(keyHash: string): Promise<void> {
+    await this.prisma.authLoginFailure.create({ data: { keyHash } });
   }
 
   private issueToken(user: AuthorizedUser): AuthToken {

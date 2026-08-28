@@ -42,6 +42,9 @@ export class PatientController {
     return this.patients.import(req.user.organizationId, data.patients, req.user.userId);
   }
 
+  @Post(':id/whatsapp-opt-out') @RequirePermissions('patient:update')
+  disableWhatsApp(@Param('id') id: string, @Req() req: { user: AuthContext }): Promise<Patient> { return this.patients.disableWhatsApp(id, req.user.organizationId, req.user.userId); }
+
   @Patch(':id') @RequirePermissions('patient:update')
   update(@Param('id') id: string, @Body() data: UpdatePatientDto, @Req() req: { user: AuthContext }): Promise<Patient> { return this.patients.update(id, req.user.organizationId, data, req.user.userId); }
 }

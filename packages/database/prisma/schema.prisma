@@ -31,21 +31,22 @@ model Organization {
   updatedAt             DateTime  @updatedAt
 
   // Relationships
-  locations       Location[]
-  departments     Department[]
-  users           User[]
-  roles           Role[]
-  patients        Patient[]
-  clinicalRecords ClinicalRecord[]
-  appointments    Appointment[]
-  visits          Visit[]
-  marketingCampaigns MarketingCampaign[]
-  auditLogs       AuditLog[]
-  oauthLoginCodes OAuthLoginCode[]
-  subscriptions   Subscription[]
-  payments        Payment[]
-  subscriptionEvents SubscriptionEvent[]
+  locations                Location[]
+  departments              Department[]
+  users                    User[]
+  roles                    Role[]
+  patients                 Patient[]
+  clinicalRecords          ClinicalRecord[]
+  appointments             Appointment[]
+  visits                   Visit[]
+  marketingCampaigns       MarketingCampaign[]
+  auditLogs                AuditLog[]
+  oauthLoginCodes          OAuthLoginCode[]
+  subscriptions            Subscription[]
+  payments                 Payment[]
+  subscriptionEvents       SubscriptionEvent[]
   messagingQuotaViolations MessagingQuotaViolation[]
+  whatsappMessages         WhatsAppMessage[]
 
   @@map("organizations")
 }
@@ -80,6 +81,15 @@ enum PaymentStatus {
 /// One current subscription is maintained per tenant. Historical changes are
 /// retained as SubscriptionEvent records, so billing can evolve without
 /// exposing sensitive payment information to clinic users.
+model AuthLoginFailure {
+  id        String   @id @default(cuid())
+  keyHash   String
+  createdAt DateTime @default(now())
+
+  @@index([keyHash, createdAt])
+  @@map("auth_login_failures")
+}
+
 model PasswordResetToken {
   id        String    @id @default(cuid())
   userId    String
@@ -168,40 +178,41 @@ model SubscriptionEvent {
 /// Patient is an organization-scoped clinical identity. It intentionally does
 /// not belong to one location so a patient can receive care across the tenant.
 model Patient {
-  id                    String    @id @default(cuid())
-  organizationId        String
-  medicalRecordNumber   String
-  firstName             String
-  lastName              String
-  dateOfBirth           DateTime?
-  admittedAt            DateTime  @default(now())
-  gender                String?
-  maritalStatus         String?
-  phone                 String?
-  whatsappPhone         String?
-  whatsappOptIn             Boolean   @default(false)
-  whatsappOptInAt           DateTime?
-  whatsappMarketingOptIn    Boolean   @default(false)
+  id                       String    @id @default(cuid())
+  organizationId           String
+  medicalRecordNumber      String
+  firstName                String
+  lastName                 String
+  dateOfBirth              DateTime?
+  admittedAt               DateTime  @default(now())
+  gender                   String?
+  maritalStatus            String?
+  phone                    String?
+  whatsappPhone            String?
+  whatsappOptIn            Boolean   @default(false)
+  whatsappOptInAt          DateTime?
+  whatsappMarketingOptIn   Boolean   @default(false)
   whatsappMarketingOptInAt DateTime?
-  occupation            String?
-  city                  String?
-  governorate           String?
-  leadSource            String?
-  marketingConsent      Boolean   @default(false)
-  marketingConsentAt    DateTime?
-  email                 String?
-  address               String?
-  emergencyContactName  String?
-  emergencyContactPhone String?
-  status                String    @default("active") // active | inactive
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  occupation               String?
+  city                     String?
+  governorate              String?
+  leadSource               String?
+  marketingConsent         Boolean   @default(false)
+  marketingConsentAt       DateTime?
+  email                    String?
+  address                  String?
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  status                   String    @default("active") // active | inactive
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  clinicalRecords ClinicalRecord[]
-  appointments    Appointment[]
-  visits          Visit[]
+  organization                Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinicalRecords             ClinicalRecord[]
+  appointments                Appointment[]
+  visits                      Visit[]
   marketingCampaignRecipients MarketingCampaignRecipient[]
+  whatsappMessages            WhatsAppMessage[]
 
   @@unique([organizationId, medicalRecordNumber])
   @@index([organizationId, lastName, firstName])
@@ -215,17 +226,17 @@ model Patient {
 // ============================================================================
 
 model MarketingCampaign {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   templateName   String
   offerText      String
   expiresAt      DateTime?
-  status         String   @default("DRAFT") // DRAFT | SENDING | COMPLETED | FAILED
+  status         String    @default("DRAFT") // DRAFT | SENDING | COMPLETED | FAILED
   createdById    String
   startedAt      DateTime?
   completedAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   organization Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy    User                         @relation(fields: [createdById], references: [id], onDelete: Restrict)
@@ -248,8 +259,9 @@ model MarketingCampaignRecipient {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  campaign MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  patient  Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  campaign         MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  patient          Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  whatsappMessages WhatsAppMessage[]
 
   @@unique([campaignId, patientId])
   @@index([campaignId, status])
@@ -257,15 +269,44 @@ model MarketingCampaignRecipient {
   @@map("marketing_campaign_recipients")
 }
 
+model WhatsAppMessage {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  patientId           String
+  appointmentId       String?
+  campaignRecipientId String?
+  category            String // utility | marketing
+  status              String    @default("QUEUED") // QUEUED | SENT | DELIVERED | READ | FAILED | SKIPPED
+  templateName        String
+  providerMessageId   String?   @unique
+  failureReason       String?
+  sentAt              DateTime?
+  deliveredAt         DateTime?
+  readAt              DateTime?
+  failedAt            DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  organization      Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patient           Patient                     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment       Appointment?                @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  campaignRecipient MarketingCampaignRecipient? @relation(fields: [campaignRecipientId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, category, createdAt])
+  @@index([organizationId, status, createdAt])
+  @@index([patientId, createdAt])
+  @@map("whatsapp_messages")
+}
+
 model MessagingQuotaViolation {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   actorId        String?
-  channel        String   // utility | marketing
+  channel        String // utility | marketing
   reason         String
-  attemptedCount Int      @default(1)
+  attemptedCount Int       @default(1)
   blockedUntil   DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   actor        User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
@@ -294,13 +335,14 @@ model Appointment {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  createdBy    User         @relation("AppointmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  doctor       User?        @relation("AppointmentDoctor", fields: [doctorId], references: [id], onDelete: SetNull)
-    visit                Visit?
-  whatsappReminderSentAt DateTime?
+  organization              Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patient                   Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdBy                 User              @relation("AppointmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  doctor                    User?             @relation("AppointmentDoctor", fields: [doctorId], references: [id], onDelete: SetNull)
+  visit                     Visit?
+  whatsappReminderSentAt    DateTime?
   whatsappReminderMessageId String?
+  whatsappMessages          WhatsAppMessage[]
 
   @@index([organizationId, scheduledAt])
   @@index([organizationId, patientId])
@@ -435,20 +477,20 @@ model User {
   updatedAt       DateTime  @updatedAt
 
   // Relationships
-  organization            Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userRoles               UserRole[]
-  authoredClinicalRecords ClinicalRecord[] @relation("ClinicalRecordAuthor")
-  createdAppointments     Appointment[]    @relation("AppointmentCreator")
-  assignedAppointments    Appointment[]    @relation("AppointmentDoctor")
-  doctorVisits            Visit[]          @relation("VisitDoctor")
-  createdVisits           Visit[]          @relation("VisitCreator")
-  auditLogs               AuditLog[]       @relation("AuditActor")
-  oauthLoginCodes         OAuthLoginCode[]
-  passwordResetTokens     PasswordResetToken[]
-  reviewedPayments        Payment[]        @relation("PaymentReviewer")
-  subscriptionEvents      SubscriptionEvent[] @relation("SubscriptionEventActor")
+  organization              Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userRoles                 UserRole[]
+  authoredClinicalRecords   ClinicalRecord[]          @relation("ClinicalRecordAuthor")
+  createdAppointments       Appointment[]             @relation("AppointmentCreator")
+  assignedAppointments      Appointment[]             @relation("AppointmentDoctor")
+  doctorVisits              Visit[]                   @relation("VisitDoctor")
+  createdVisits             Visit[]                   @relation("VisitCreator")
+  auditLogs                 AuditLog[]                @relation("AuditActor")
+  oauthLoginCodes           OAuthLoginCode[]
+  passwordResetTokens       PasswordResetToken[]
+  reviewedPayments          Payment[]                 @relation("PaymentReviewer")
+  subscriptionEvents        SubscriptionEvent[]       @relation("SubscriptionEventActor")
   createdMarketingCampaigns MarketingCampaign[]
-  messagingQuotaViolations MessagingQuotaViolation[]
+  messagingQuotaViolations  MessagingQuotaViolation[]
 
   @@unique([organizationId, email])
   @@index([organizationId, email])

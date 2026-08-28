@@ -8,7 +8,12 @@ async function bootstrap() {
   // Import batches contain up to 1,000 validated patient records. Nest's
   // default JSON limit is too small for that legitimate migration request.
   const app = await NestFactory.create(AppModule, { bodyParser: false });
-  app.use(json({ limit: '5mb' }));
+  app.use(json({
+    limit: '5mb',
+    verify: (request: Request, _response: Response, buffer: Buffer) => {
+      if (request.path.endsWith('/whatsapp/webhook')) (request as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    },
+  }));
   app.use((_request: Request, response: Response, next: NextFunction) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('X-Frame-Options', 'DENY');

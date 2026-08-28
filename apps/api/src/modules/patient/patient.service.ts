@@ -190,6 +190,7 @@ export class PatientService {
   }
 
   async marketingAudience(organizationId: string, filters: MarketingAudienceQueryDto) {
+    await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
     const where = this.audienceWhere(organizationId, filters);
     const [total, samples] = await Promise.all([
       this.prisma.patient.count({ where }),
@@ -204,6 +205,7 @@ export class PatientService {
   }
 
   async exportMarketingAudience(organizationId: string, filters: MarketingAudienceQueryDto, actorId?: string) {
+    await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
     const audience = await this.prisma.patient.findMany({
       where: this.audienceWhere(organizationId, filters),
       orderBy: { createdAt: 'asc' },
@@ -215,6 +217,13 @@ export class PatientService {
 
   private generateMedicalRecordNumber(): string {
     return `MRN-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+  }
+
+  async disableWhatsApp(id: string, organizationId: string, actorId?: string): Promise<Patient> {
+    const patient = await this.get(id, organizationId);
+    const updated = await this.prisma.patient.update({ where: { id: patient.id }, data: { whatsappOptIn: false, whatsappOptInAt: null, whatsappMarketingOptIn: false, whatsappMarketingOptInAt: null } });
+    await this.audit.log({ organizationId, actorId, action: 'patient.whatsapp_opted_out', entityType: 'patient', entityId: patient.id, summary: 'Disabled WhatsApp communications for patient' });
+    return updated as unknown as Patient;
   }
 
   async update(

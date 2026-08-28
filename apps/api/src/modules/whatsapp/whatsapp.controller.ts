@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Param, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { PermissionsGuard } from '../auth/permissions.guard';
@@ -11,6 +12,27 @@ import { WhatsAppService } from './whatsapp.service';
 export class WhatsAppController {
   constructor(private readonly whatsapp: WhatsAppService, private readonly marketing: WhatsAppMarketingService) {}
 
+  @Get('webhook')
+  verifyWebhook(
+    @Query('hub.mode') mode?: string,
+    @Query('hub.verify_token') verifyToken?: string,
+    @Query('hub.challenge') challenge?: string,
+  ) {
+    const expected = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+    if (!expected || mode !== 'subscribe' || verifyToken !== expected || !challenge) throw new UnauthorizedException('Invalid WhatsApp webhook verification');
+    return challenge;
+  }
+
+  @Post('webhook')
+  receiveWebhook(
+    @Body() body: unknown,
+    @Headers('x-hub-signature-256') signature: string | undefined,
+    @Req() request: Request,
+  ) {
+    const rawBody = (request as Request & { rawBody?: Buffer }).rawBody;
+    return this.whatsapp.handleWebhook(body, rawBody, signature);
+  }
+
   @Post('reminders/run')
   runReminders(@Headers('authorization') authorization?: string) {
     const expected = process.env.CRON_SECRET || process.env.WHATSAPP_CRON_SECRET;
@@ -21,6 +43,13 @@ export class WhatsAppController {
   @Get('reminders/run')
   runRemindersFromVercelCron(@Headers('authorization') authorization?: string) {
     return this.runReminders(authorization);
+  }
+
+  @Get('messages')
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:read')
+  listMessages(@Req() req: { user: AuthContext }) {
+    return this.whatsapp.listMessages(req.user.organizationId);
   }
 
   @Get('campaigns')
