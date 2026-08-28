@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PLAN_CATALOG } from '../subscription/subscription.service';
 
 type WhatsAppApiResponse = { ok: boolean; status: number; json(): Promise<unknown> };
 type ReminderResult = { appointmentId: string; status: 'sent' | 'skipped' | 'failed'; reason?: string; messageId?: string };
@@ -128,12 +129,8 @@ export class WhatsAppService {
   }
 
   private monthlyLimitForPlan(plan: string): number | null {
-    const normalized = plan.toUpperCase();
-    if (normalized === 'STARTER') return 100;
-    if (normalized === 'PROFESSIONAL') return 300;
-    if (normalized === 'CLINIC') return 1000;
-    if (normalized === 'CENTER' || normalized === 'ENTERPRISE') return null;
-    return 0;
+    const normalized = plan.toUpperCase() as keyof typeof PLAN_CATALOG;
+    return PLAN_CATALOG[normalized]?.whatsappUtilityMessages ?? 0;
   }
 
   private monthlyMessageLimit(): number | null {

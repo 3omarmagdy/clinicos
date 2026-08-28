@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { CreateMarketingCampaignDto, MarketingCampaignFiltersDto, SendMarketingCampaignDto } from './marketing.dto';
+import { PLAN_CATALOG } from '../subscription/subscription.service';
 
 type ProviderResponse = { ok: boolean; status: number; json(): Promise<unknown> };
 type DeliveryResult = { recipientId: string; patientId: string; status: 'sent' | 'failed' | 'skipped'; reason?: string; messageId?: string };
@@ -93,7 +94,8 @@ export class WhatsAppMarketingService {
     if (!campaign) throw new NotFoundException('Campaign not found');
     if (campaign.status === 'COMPLETED') throw new BadRequestException('Campaign has already completed');
 
-    const planLimit = this.monthlyLimitForPlan(campaign.organization.subscriptionPlan);
+    const planLimit = this.monthlyTotalLimitForPlan(campaign.organization.subscriptionPlan);
+    const marketingLimit = this.monthlyMarketingLimitForPlan(campaign.organization.subscriptionPlan);
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
@@ -102,9 +104,12 @@ export class WhatsAppMarketingService {
       this.prisma.marketingCampaignRecipient.count({ where: { campaign: { organizationId }, status: 'SENT', sentAt: { gte: monthStart } } }),
     ]);
     const usedThisMonth = reminderUsage + marketingUsage;
-    if (planLimit === 0) throw new BadRequestException('WhatsApp is not included in the current plan');
+    if (planLimit === 0 || marketingLimit === 0) throw new BadRequestException('WhatsApp marketing is not included in the current plan');
+    if (marketingLimit !== null && marketingUsage >= marketingLimit) throw new BadRequestException('Monthly WhatsApp marketing message limit reached');
     if (planLimit !== null && usedThisMonth >= planLimit) throw new BadRequestException('Monthly WhatsApp message limit reached');
-    const available = planLimit === null ? campaign.recipients.length : Math.min(campaign.recipients.length, planLimit - usedThisMonth);
+    const availableByMarketing = marketingLimit === null ? campaign.recipients.length : marketingLimit - marketingUsage;
+    const availableByTotal = planLimit === null ? campaign.recipients.length : planLimit - usedThisMonth;
+    const available = Math.min(campaign.recipients.length, availableByMarketing, availableByTotal);
     const recipients = campaign.recipients.slice(0, available);
 
     await this.prisma.marketingCampaign.update({ where: { id: campaign.id }, data: { status: 'SENDING', startedAt: campaign.startedAt ?? new Date() } });
@@ -200,13 +205,14 @@ export class WhatsAppMarketingService {
     return where;
   }
 
-  private monthlyLimitForPlan(plan: string): number | null {
-    const normalized = plan.toUpperCase();
-    if (normalized === 'STARTER') return 100;
-    if (normalized === 'PROFESSIONAL') return 300;
-    if (normalized === 'CLINIC') return 1000;
-    if (normalized === 'CENTER' || normalized === 'ENTERPRISE') return null;
-    return 0;
+  private monthlyTotalLimitForPlan(plan: string): number | null {
+    const normalized = plan.toUpperCase() as keyof typeof PLAN_CATALOG;
+    return PLAN_CATALOG[normalized]?.whatsappMonthlyMessages ?? 0;
+  }
+
+  private monthlyMarketingLimitForPlan(plan: string): number | null {
+    const normalized = plan.toUpperCase() as keyof typeof PLAN_CATALOG;
+    return PLAN_CATALOG[normalized]?.whatsappMarketingMessages ?? 0;
   }
 
   private configuration() {
