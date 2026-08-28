@@ -43,7 +43,8 @@ export class WhatsAppService {
     if (!rawBody || !signature || !this.isRecord(payload) || payload.object !== 'whatsapp_business_account') throw new BadRequestException('Invalid WhatsApp webhook payload');
     const expectedPhoneNumberId = this.firstWebhookPhoneNumberId(payload);
     const integration = expectedPhoneNumberId && this.integrations ? await this.integrations.getByPhoneNumberId(expectedPhoneNumberId) : null;
-    const appSecret = integration?.appSecret || (process.env.NODE_ENV === 'test' ? process.env.WHATSAPP_APP_SECRET || process.env.META_APP_SECRET : undefined);
+    if (this.integrations && !integration) throw new UnauthorizedException('Unknown WhatsApp phone number');
+    const appSecret = process.env.WHATSAPP_APP_SECRET || process.env.META_APP_SECRET;
     if (!appSecret || !expectedPhoneNumberId || !this.verifyWebhookSignature(rawBody, signature, appSecret)) throw new UnauthorizedException('Invalid WhatsApp webhook signature');
 
     let processed = 0;

@@ -19,9 +19,8 @@ export class WhatsAppController {
     @Query('hub.verify_token') verifyToken?: string,
     @Query('hub.challenge') challenge?: string,
   ) {
-    if (mode !== 'subscribe' || !verifyToken || !challenge) throw new UnauthorizedException('Invalid WhatsApp webhook verification');
-    const integration = await this.integrations.getByVerifyToken(verifyToken);
-    if (!integration) throw new UnauthorizedException('Invalid WhatsApp webhook verification');
+    const expected = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+    if (!expected || mode !== 'subscribe' || verifyToken !== expected || !challenge) throw new UnauthorizedException('Invalid WhatsApp webhook verification');
     return challenge;
   }
 

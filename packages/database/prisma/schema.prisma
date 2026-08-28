@@ -274,9 +274,10 @@ model WhatsAppIntegration {
   id                       String       @id @default(cuid())
   organizationId           String       @unique
   phoneNumberId            String       @unique
+  wabaId                   String
   accessTokenCiphertext    String
-  appSecretCiphertext      String
-  webhookVerifyTokenHash   String       @unique
+  accessTokenIv            String
+  accessTokenAuthTag       String
   apiVersion               String       @default("v26.0")
   appointmentTemplate      String
   marketingTemplate        String?
