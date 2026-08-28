@@ -229,6 +229,7 @@ export class WhatsAppMarketingService {
   private audienceWhere(organizationId: string, filters: MarketingCampaignFiltersDto): Prisma.PatientWhereInput {
     const where: Prisma.PatientWhereInput = {
       organizationId,
+      ...(filters.patientIds?.length ? { id: { in: filters.patientIds } } : {}),
       status: 'active',
       marketingConsent: true,
       whatsappMarketingOptIn: true,

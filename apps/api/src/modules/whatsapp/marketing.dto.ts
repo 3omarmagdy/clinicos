@@ -1,7 +1,8 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class MarketingCampaignFiltersDto {
+  @IsOptional() @IsArray() @ArrayUnique() @ArrayMaxSize(1000) @IsString({ each: true }) patientIds?: string[];
   @IsOptional() @IsString() @MaxLength(120) governorate?: string;
   @IsOptional() @IsString() @MaxLength(120) city?: string;
   @IsOptional() @IsString() @MaxLength(40) gender?: string;
