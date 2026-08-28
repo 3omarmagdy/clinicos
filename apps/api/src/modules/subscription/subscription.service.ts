@@ -55,7 +55,11 @@ export class SubscriptionService {
       accountName: process.env.PAYMENT_ACCOUNT_NAME || '',
       accountNumber: process.env.PAYMENT_ACCOUNT_NUMBER || '',
       iban: process.env.PAYMENT_IBAN || '',
+      swiftCode: process.env.PAYMENT_SWIFT_CODE || '',
       instapayAddress: process.env.PAYMENT_INSTAPAY_ADDRESS || '',
+      instapayLink: process.env.PAYMENT_INSTAPAY_LINK || '',
+      emoneyPhone: process.env.PAYMENT_EMONEY_PHONE || '',
+      emoneyAppLink: process.env.PAYMENT_EMONEY_APP_LINK || 'https://flous.page.link/eAndMoney',
       reviewWindow: process.env.PAYMENT_REVIEW_WINDOW || 'تتم مراجعة الطلب خلال أيام العمل بعد التحقق من التحويل.',
       note: process.env.PAYMENT_INSTRUCTIONS_NOTE || 'لا ترسل كلمة المرور أو PIN أو OTP أو بيانات البطاقة. أدخل رقم العملية فقط.',
     };
