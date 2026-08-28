@@ -136,14 +136,16 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
     void load();
   }, [load]);
 
-  async function disableWhatsApp() {
-    if (!window.confirm('هل تريد إيقاف جميع رسائل WhatsApp لهذا المريض؟')) return;
+  async function disableWhatsApp(kind: 'reminders' | 'marketing' | 'all') {
+    const labels = { reminders: 'تذكيرات المواعيد', marketing: 'العروض', all: 'كل رسائل WhatsApp' };
+    if (!window.confirm(`هل تريد إيقاف ${labels[kind]} لهذا المريض؟`)) return;
     setWhatsappSaving(true);
     setWhatsappNotice('');
     try {
-      const response = await authenticatedFetch(`/api/v1/patients/${params.id}/whatsapp-opt-out`, { method: 'POST' });
-      if (!response.ok) throw new Error(await getApiErrorMessage(response, 'تعذر إيقاف رسائل WhatsApp.'));
-      setWhatsappNotice('تم إيقاف تذكيرات المواعيد والعروض لهذا المريض.');
+      const endpoint = kind === 'reminders' ? 'whatsapp-reminders-opt-out' : kind === 'marketing' ? 'whatsapp-marketing-opt-out' : 'whatsapp-opt-out';
+      const response = await authenticatedFetch(`/api/v1/patients/${params.id}/${endpoint}`, { method: 'POST' });
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, 'تعذر تحديث تفضيلات WhatsApp.'));
+      setWhatsappNotice(`تم إيقاف ${labels[kind]} لهذا المريض.`);
       await load();
     } catch (reason) {
       setWhatsappNotice(reason instanceof Error ? reason.message : 'تعذر إيقاف الرسائل.');
@@ -282,7 +284,7 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
                     <p className="font-black text-[#153c63]">تفضيلات التواصل عبر WhatsApp</p>
                     <p className="mt-1 text-sm text-slate-600">تذكيرات المواعيد: {patient.whatsappOptIn ? 'مفعّلة' : 'متوقفة'} · العروض: {patient.whatsappMarketingOptIn ? 'مفعّلة' : 'متوقفة'}</p>
                   </div>
-                  {canUpdate && (patient.whatsappOptIn || patient.whatsappMarketingOptIn) ? <button type="button" onClick={() => void disableWhatsApp()} disabled={whatsappSaving} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 disabled:opacity-60">{whatsappSaving ? 'جارٍ الإيقاف…' : 'إيقاف كل رسائل WhatsApp'}</button> : null}
+                  {canUpdate && (patient.whatsappOptIn || patient.whatsappMarketingOptIn) ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void disableWhatsApp('reminders')} disabled={whatsappSaving || !patient.whatsappOptIn} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 disabled:opacity-50">إيقاف التذكيرات</button><button type="button" onClick={() => void disableWhatsApp('marketing')} disabled={whatsappSaving || !patient.whatsappMarketingOptIn} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">إيقاف العروض</button><button type="button" onClick={() => void disableWhatsApp('all')} disabled={whatsappSaving} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">إيقاف الكل</button></div> : null}
                 </div>
                 {whatsappNotice ? <p role="status" className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{whatsappNotice}</p> : null}
               </div>

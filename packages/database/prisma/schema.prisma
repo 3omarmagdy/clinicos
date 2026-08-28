@@ -47,6 +47,7 @@ model Organization {
   subscriptionEvents       SubscriptionEvent[]
   messagingQuotaViolations MessagingQuotaViolation[]
   whatsappMessages         WhatsAppMessage[]
+  whatsappIntegration      WhatsAppIntegration?
 
   @@map("organizations")
 }
@@ -267,6 +268,26 @@ model MarketingCampaignRecipient {
   @@index([campaignId, status])
   @@index([patientId, createdAt])
   @@map("marketing_campaign_recipients")
+}
+
+model WhatsAppIntegration {
+  id                       String       @id @default(cuid())
+  organizationId           String       @unique
+  phoneNumberId            String       @unique
+  accessTokenCiphertext    String
+  appSecretCiphertext      String
+  webhookVerifyTokenHash   String       @unique
+  apiVersion               String       @default("v26.0")
+  appointmentTemplate      String
+  marketingTemplate        String?
+  templateLanguage         String       @default("ar")
+  enabled                  Boolean      @default(false)
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([enabled])
+  @@map("whatsapp_integrations")
 }
 
 model WhatsAppMessage {

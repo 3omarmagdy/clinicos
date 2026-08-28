@@ -219,10 +219,24 @@ export class PatientService {
     return `MRN-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
   }
 
+  async disableWhatsAppReminders(id: string, organizationId: string, actorId?: string): Promise<Patient> {
+    const patient = await this.get(id, organizationId);
+    const updated = await this.prisma.patient.update({ where: { id: patient.id }, data: { whatsappOptIn: false, whatsappOptInAt: null } });
+    await this.audit.log({ organizationId, actorId, action: 'patient.whatsapp_reminders_opted_out', entityType: 'patient', entityId: patient.id, summary: 'Disabled WhatsApp appointment reminders for patient' });
+    return updated as unknown as Patient;
+  }
+
+  async disableWhatsAppMarketing(id: string, organizationId: string, actorId?: string): Promise<Patient> {
+    const patient = await this.get(id, organizationId);
+    const updated = await this.prisma.patient.update({ where: { id: patient.id }, data: { whatsappMarketingOptIn: false, whatsappMarketingOptInAt: null } });
+    await this.audit.log({ organizationId, actorId, action: 'patient.whatsapp_marketing_opted_out', entityType: 'patient', entityId: patient.id, summary: 'Disabled WhatsApp marketing messages for patient' });
+    return updated as unknown as Patient;
+  }
+
   async disableWhatsApp(id: string, organizationId: string, actorId?: string): Promise<Patient> {
     const patient = await this.get(id, organizationId);
     const updated = await this.prisma.patient.update({ where: { id: patient.id }, data: { whatsappOptIn: false, whatsappOptInAt: null, whatsappMarketingOptIn: false, whatsappMarketingOptInAt: null } });
-    await this.audit.log({ organizationId, actorId, action: 'patient.whatsapp_opted_out', entityType: 'patient', entityId: patient.id, summary: 'Disabled WhatsApp communications for patient' });
+    await this.audit.log({ organizationId, actorId, action: 'patient.whatsapp_opted_out', entityType: 'patient', entityId: patient.id, summary: 'Disabled all WhatsApp communications for patient' });
     return updated as unknown as Patient;
   }
 

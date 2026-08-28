@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PLAN_CATALOG } from '../subscription/subscription.service';
+import { WhatsAppIntegrationService } from './whatsapp-integration.service';
 
 type WhatsAppApiResponse = { ok: boolean; status: number; json(): Promise<unknown> };
 type ReminderResult = { appointmentId: string; status: 'sent' | 'skipped' | 'failed'; reason?: string; messageId?: string };
@@ -10,7 +11,7 @@ type ReminderResult = { appointmentId: string; status: 'sent' | 'skipped' | 'fai
 export class WhatsAppService {
   private readonly logger = new Logger('WhatsAppService');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly integrations?: WhatsAppIntegrationService) {}
 
   async listMessages(organizationId: string) {
     return this.prisma.whatsAppMessage.findMany({
@@ -25,21 +26,25 @@ export class WhatsAppService {
     });
   }
 
-  status() {
+  async status(organizationId: string) {
+    const integration = this.integrations ? await this.integrations.getForOrganization(organizationId) : null;
     return {
-      enabled: process.env.WHATSAPP_SEND_ENABLED === 'true',
-      configured: Boolean(process.env.WHATSAPP_SEND_ENABLED === 'true' && process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_APPOINTMENT_TEMPLATE),
-      templateName: process.env.WHATSAPP_APPOINTMENT_TEMPLATE || null,
+      enabled: Boolean(integration?.enabled && process.env.WHATSAPP_SEND_ENABLED === 'true'),
+      configured: Boolean(integration),
+      phoneNumberId: integration?.phoneNumberId || null,
+      appointmentTemplate: integration?.appointmentTemplate || null,
+      marketingTemplate: integration?.marketingTemplate || null,
       reminderLeadHours: this.reminderLeadHours(),
       monthlyMessageLimit: this.monthlyMessageLimit(),
     };
   }
 
   async handleWebhook(payload: unknown, rawBody: Buffer | undefined, signature?: string): Promise<{ processed: number; ignored: number }> {
-    const appSecret = process.env.WHATSAPP_APP_SECRET || process.env.META_APP_SECRET;
-    const expectedPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    if (!appSecret || !rawBody || !signature || !this.verifyWebhookSignature(rawBody, signature, appSecret)) throw new UnauthorizedException('Invalid WhatsApp webhook signature');
-    if (!expectedPhoneNumberId || !this.isRecord(payload) || payload.object !== 'whatsapp_business_account') throw new BadRequestException('Invalid WhatsApp webhook payload');
+    if (!rawBody || !signature || !this.isRecord(payload) || payload.object !== 'whatsapp_business_account') throw new BadRequestException('Invalid WhatsApp webhook payload');
+    const expectedPhoneNumberId = this.firstWebhookPhoneNumberId(payload);
+    const integration = expectedPhoneNumberId && this.integrations ? await this.integrations.getByPhoneNumberId(expectedPhoneNumberId) : null;
+    const appSecret = integration?.appSecret || (process.env.NODE_ENV === 'test' ? process.env.WHATSAPP_APP_SECRET || process.env.META_APP_SECRET : undefined);
+    if (!appSecret || !expectedPhoneNumberId || !this.verifyWebhookSignature(rawBody, signature, appSecret)) throw new UnauthorizedException('Invalid WhatsApp webhook signature');
 
     let processed = 0;
     let ignored = 0;
@@ -67,6 +72,7 @@ export class WhatsAppService {
     const existing = await this.prisma.whatsAppMessage.findUnique({ where: { providerMessageId }, select: { id: true, status: true } });
     if (!existing) return false;
     const rank: Record<string, number> = { QUEUED: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4 };
+    if (existing.status === nextStatus) return true;
     if (nextStatus !== 'FAILED' && (rank[existing.status] ?? 0) > rank[nextStatus]) return true;
     const eventAt = this.webhookEventDate(timestamp);
     const data: Record<string, unknown> = { status: nextStatus };
@@ -81,6 +87,18 @@ export class WhatsAppService {
     }
     await this.prisma.whatsAppMessage.update({ where: { id: existing.id }, data });
     return true;
+  }
+
+  private firstWebhookPhoneNumberId(payload: Record<string, unknown>): string | null {
+    for (const entry of this.asArray(payload.entry)) {
+      if (!this.isRecord(entry)) continue;
+      for (const change of this.asArray(entry.changes)) {
+        if (!this.isRecord(change) || !this.isRecord(change.value)) continue;
+        const metadata = this.isRecord(change.value.metadata) ? change.value.metadata : null;
+        if (metadata && typeof metadata.phone_number_id === 'string') return metadata.phone_number_id;
+      }
+    }
+    return null;
   }
 
   private verifyWebhookSignature(rawBody: Buffer, signature: string, appSecret: string): boolean {
@@ -139,7 +157,7 @@ export class WhatsAppService {
     const to = this.normalizePhone(appointment.patient.whatsappPhone || appointment.patient.phone);
     if (!to) return { appointmentId: appointment.id, status: 'skipped', reason: 'missing_or_invalid_phone' };
 
-    const config = this.configuration();
+    const config = await this.configuration(appointment.organizationId);
     if (!config) return { appointmentId: appointment.id, status: 'skipped', reason: 'whatsapp_not_configured' };
 
     const currentMonthStart = new Date();
@@ -207,7 +225,13 @@ export class WhatsAppService {
     }
   }
 
-  private configuration() {
+  private async configuration(organizationId: string) {
+    if (this.integrations) {
+      const integration = await this.integrations.getForOrganization(organizationId);
+      if (!integration || !integration.enabled || process.env.WHATSAPP_SEND_ENABLED !== 'true') return null;
+      return { accessToken: integration.accessToken, phoneNumberId: integration.phoneNumberId, template: integration.appointmentTemplate, language: integration.templateLanguage, apiVersion: integration.apiVersion, monthlyLimit: this.monthlyMessageLimit() };
+    }
+    if (process.env.NODE_ENV !== 'test') return null;
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     const template = process.env.WHATSAPP_APPOINTMENT_TEMPLATE;

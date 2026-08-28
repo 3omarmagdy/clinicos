@@ -1,25 +1,27 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Put, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import type { AuthContext } from '@clinicos/shared-types';
-import { CreateMarketingCampaignDto, SendMarketingCampaignDto } from './marketing.dto';
+import { CreateMarketingCampaignDto, SendMarketingCampaignDto, UpsertWhatsAppIntegrationDto } from './marketing.dto';
 import { WhatsAppMarketingService } from './whatsapp-marketing.service';
 import { WhatsAppService } from './whatsapp.service';
+import { WhatsAppIntegrationService } from './whatsapp-integration.service';
 
 @Controller('whatsapp')
 export class WhatsAppController {
-  constructor(private readonly whatsapp: WhatsAppService, private readonly marketing: WhatsAppMarketingService) {}
+  constructor(private readonly whatsapp: WhatsAppService, private readonly marketing: WhatsAppMarketingService, private readonly integrations: WhatsAppIntegrationService) {}
 
   @Get('webhook')
-  verifyWebhook(
+  async verifyWebhook(
     @Query('hub.mode') mode?: string,
     @Query('hub.verify_token') verifyToken?: string,
     @Query('hub.challenge') challenge?: string,
   ) {
-    const expected = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
-    if (!expected || mode !== 'subscribe' || verifyToken !== expected || !challenge) throw new UnauthorizedException('Invalid WhatsApp webhook verification');
+    if (mode !== 'subscribe' || !verifyToken || !challenge) throw new UnauthorizedException('Invalid WhatsApp webhook verification');
+    const integration = await this.integrations.getByVerifyToken(verifyToken);
+    if (!integration) throw new UnauthorizedException('Invalid WhatsApp webhook verification');
     return challenge;
   }
 
@@ -43,6 +45,21 @@ export class WhatsAppController {
   @Get('reminders/run')
   runRemindersFromVercelCron(@Headers('authorization') authorization?: string) {
     return this.runReminders(authorization);
+  }
+
+  @Get('integration')
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:read')
+  integrationSummary(@Req() req: { user: AuthContext }) {
+    return this.integrations.summary(req.user.organizationId);
+  }
+
+  @Put('integration')
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:update')
+  async upsertIntegration(@Body() data: UpsertWhatsAppIntegrationDto, @Req() req: { user: AuthContext }) {
+    await this.integrations.upsert(req.user.organizationId, data);
+    return { saved: true };
   }
 
   @Get('messages')
@@ -90,7 +107,7 @@ export class WhatsAppController {
   @Get('status')
   @UseGuards(AuthGuard('jwt'), PermissionsGuard)
   @RequirePermissions('organization:read')
-  status() {
-    return this.whatsapp.status();
+  status(@Req() req: { user: AuthContext }) {
+    return this.whatsapp.status(req.user.organizationId);
   }
 }
