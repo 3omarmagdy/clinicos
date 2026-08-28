@@ -7,14 +7,14 @@ import { EmailService } from '../auth/email.service';
 type LimitKey = 'users' | 'doctors' | 'patients' | 'appointments' | 'branches';
 type PlanName = 'FREE_TRIAL' | 'STARTER' | 'PROFESSIONAL' | 'CLINIC' | 'CENTER';
 
-type PlanCatalogEntry = { label: string; priceEgp: number | null; whatsappMonthlyMessages: number | null; limits: Record<LimitKey, number | null> };
+export type PlanCatalogEntry = { label: string; priceEgp: number | null; whatsappMonthlyMessages: number | null; whatsappUtilityMessages: number | null; whatsappMarketingMessages: number | null; limits: Record<LimitKey, number | null> };
 
 export const PLAN_CATALOG: Record<PlanName, PlanCatalogEntry> = {
-  FREE_TRIAL: { label: 'تجربة مجانية', priceEgp: 0, whatsappMonthlyMessages: 0, limits: { users: 2, doctors: 1, patients: 50, appointments: 50, branches: 1 } },
-  STARTER: { label: 'Starter', priceEgp: 399, whatsappMonthlyMessages: 100, limits: { users: 2, doctors: 1, patients: 500, appointments: 300, branches: 1 } },
-  PROFESSIONAL: { label: 'Professional', priceEgp: 699, whatsappMonthlyMessages: 300, limits: { users: 5, doctors: 2, patients: 2000, appointments: null, branches: 1 } },
-  CLINIC: { label: 'Clinic', priceEgp: 999, whatsappMonthlyMessages: 1000, limits: { users: 10, doctors: 5, patients: null, appointments: null, branches: 1 } },
-  CENTER: { label: 'Center', priceEgp: null, whatsappMonthlyMessages: null, limits: { users: null, doctors: null, patients: null, appointments: null, branches: null } },
+  FREE_TRIAL: { label: 'تجربة مجانية', priceEgp: 0, whatsappMonthlyMessages: 0, whatsappUtilityMessages: 0, whatsappMarketingMessages: 0, limits: { users: 2, doctors: 1, patients: 50, appointments: 50, branches: 1 } },
+  STARTER: { label: 'Starter', priceEgp: 449, whatsappMonthlyMessages: 100, whatsappUtilityMessages: 90, whatsappMarketingMessages: 10, limits: { users: 2, doctors: 1, patients: 500, appointments: 300, branches: 1 } },
+  PROFESSIONAL: { label: 'Professional', priceEgp: 799, whatsappMonthlyMessages: 300, whatsappUtilityMessages: 270, whatsappMarketingMessages: 30, limits: { users: 5, doctors: 2, patients: 2000, appointments: null, branches: 1 } },
+  CLINIC: { label: 'Clinic', priceEgp: 1199, whatsappMonthlyMessages: 1000, whatsappUtilityMessages: 900, whatsappMarketingMessages: 100, limits: { users: 10, doctors: 5, patients: null, appointments: null, branches: 1 } },
+  CENTER: { label: 'Center', priceEgp: null, whatsappMonthlyMessages: null, whatsappUtilityMessages: null, whatsappMarketingMessages: null, limits: { users: null, doctors: null, patients: null, appointments: null, branches: null } },
 };
 
 @Injectable()
@@ -69,15 +69,16 @@ export class SubscriptionService {
     const subscription = await this.resolveStatus(organizationId);
     const catalog = PLAN_CATALOG[subscription.plan as PlanName];
     const now = new Date(); const monthStart = new Date(now.getFullYear(), now.getMonth(), 1); const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const [users, doctors, patients, appointments, branches, whatsappMessages] = await Promise.all([
+    const [users, doctors, patients, appointments, branches, whatsappMessages, marketingMessages] = await Promise.all([
       this.prisma.user.count({ where: { organizationId, status: 'active' } }),
       this.prisma.user.count({ where: { organizationId, status: 'active', role: 'doctor' } }),
       this.prisma.patient.count({ where: { organizationId } }),
       this.prisma.appointment.count({ where: { organizationId, scheduledAt: { gte: monthStart, lt: nextMonth } } }),
       this.prisma.location.count({ where: { organizationId, status: 'active' } }),
       this.prisma.appointment.count({ where: { organizationId, whatsappReminderSentAt: { gte: monthStart, lt: nextMonth } } }),
+      this.prisma.marketingCampaignRecipient.count({ where: { campaign: { organizationId }, status: 'SENT', sentAt: { gte: monthStart, lt: nextMonth } } }),
     ]);
-    return { ...subscription, catalog, limits: catalog.limits, usage: { users, doctors, patients, appointments, branches, whatsappMessages }, readOnly: ['EXPIRED', 'PAST_DUE', 'CANCELED'].includes(subscription.status), remainingTrialDays: subscription.trialEndsAt ? Math.max(0, Math.ceil((subscription.trialEndsAt.getTime() - Date.now()) / 86_400_000)) : null };
+    return { ...subscription, catalog, limits: catalog.limits, usage: { users, doctors, patients, appointments, branches, whatsappMessages: whatsappMessages + marketingMessages, whatsappUtilityMessages: whatsappMessages, whatsappMarketingMessages: marketingMessages }, readOnly: ['EXPIRED', 'PAST_DUE', 'CANCELED'].includes(subscription.status), remainingTrialDays: subscription.trialEndsAt ? Math.max(0, Math.ceil((subscription.trialEndsAt.getTime() - Date.now()) / 86_400_000)) : null };
   }
 
   async assertCanWrite(organizationId: string): Promise<void> {
