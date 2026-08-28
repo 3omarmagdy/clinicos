@@ -5,11 +5,12 @@ import { AuditModule } from '../audit/audit.module';
 import { WhatsAppController } from './whatsapp.controller';
 import { WhatsAppMarketingService } from './whatsapp-marketing.service';
 import { WhatsAppService } from './whatsapp.service';
+import { MessagingQuotaGuardService } from './messaging-quota-guard.service';
 
 @Module({
   imports: [PrismaModule, AuthModule, AuditModule],
   controllers: [WhatsAppController],
-  providers: [WhatsAppService, WhatsAppMarketingService],
-  exports: [WhatsAppService, WhatsAppMarketingService],
+  providers: [WhatsAppService, WhatsAppMarketingService, MessagingQuotaGuardService],
+  exports: [WhatsAppService, WhatsAppMarketingService, MessagingQuotaGuardService],
 })
 export class WhatsAppModule {}

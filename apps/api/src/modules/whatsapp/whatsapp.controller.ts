@@ -30,6 +30,13 @@ export class WhatsAppController {
     return this.marketing.list(req.user.organizationId);
   }
 
+  @Get('quota-violations')
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('marketing:send')
+  listQuotaViolations(@Req() req: { user: AuthContext }) {
+    return this.marketing.listQuotaViolations(req.user.organizationId);
+  }
+
   @Post('campaigns/preview')
   @UseGuards(AuthGuard('jwt'), PermissionsGuard)
   @RequirePermissions('marketing:send')

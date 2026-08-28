@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { CreateMarketingCampaignDto, MarketingCampaignFiltersDto, SendMarketingCampaignDto } from './marketing.dto';
 import { PLAN_CATALOG } from '../subscription/subscription.service';
+import { MessagingQuotaGuardService } from './messaging-quota-guard.service';
 
 type ProviderResponse = { ok: boolean; status: number; json(): Promise<unknown> };
 type DeliveryResult = { recipientId: string; patientId: string; status: 'sent' | 'failed' | 'skipped'; reason?: string; messageId?: string };
@@ -12,7 +13,7 @@ type DeliveryResult = { recipientId: string; patientId: string; status: 'sent' |
 export class WhatsAppMarketingService {
   private readonly logger = new Logger('WhatsAppMarketingService');
 
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly quotaGuard: MessagingQuotaGuardService) {}
 
   async list(organizationId: string) {
     return this.prisma.marketingCampaign.findMany({
@@ -25,6 +26,15 @@ export class WhatsAppMarketingService {
         _count: { select: { recipients: true } },
         recipients: { where: { status: 'SENT' }, select: { id: true } },
       },
+    });
+  }
+
+  async listQuotaViolations(organizationId: string) {
+    return this.prisma.messagingQuotaViolation.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: { id: true, channel: true, reason: true, attemptedCount: true, blockedUntil: true, createdAt: true },
     });
   }
 
@@ -81,6 +91,7 @@ export class WhatsAppMarketingService {
 
   async send(organizationId: string, actorId: string, campaignId: string, data: SendMarketingCampaignDto) {
     if (!data.confirm) throw new BadRequestException('Explicit confirmation is required before sending');
+    await this.quotaGuard.assertNotBlocked(organizationId, actorId, 'marketing');
     const config = this.configuration();
     if (!config) throw new BadRequestException('WhatsApp marketing template is not configured or approved yet');
 
@@ -104,9 +115,18 @@ export class WhatsAppMarketingService {
       this.prisma.marketingCampaignRecipient.count({ where: { campaign: { organizationId }, status: 'SENT', sentAt: { gte: monthStart } } }),
     ]);
     const usedThisMonth = reminderUsage + marketingUsage;
-    if (planLimit === 0 || marketingLimit === 0) throw new BadRequestException('WhatsApp marketing is not included in the current plan');
-    if (marketingLimit !== null && marketingUsage >= marketingLimit) throw new BadRequestException('Monthly WhatsApp marketing message limit reached');
-    if (planLimit !== null && usedThisMonth >= planLimit) throw new BadRequestException('Monthly WhatsApp message limit reached');
+    if (planLimit === 0 || marketingLimit === 0) {
+      await this.quotaGuard.record(organizationId, actorId, 'marketing', 'marketing_not_included_in_plan');
+      throw new BadRequestException('WhatsApp marketing is not included in the current plan');
+    }
+    if (marketingLimit !== null && marketingUsage >= marketingLimit) {
+      await this.quotaGuard.record(organizationId, actorId, 'marketing', 'marketing_monthly_limit_reached', campaign.recipients.length);
+      throw new BadRequestException('Monthly WhatsApp marketing message limit reached');
+    }
+    if (planLimit !== null && usedThisMonth >= planLimit) {
+      await this.quotaGuard.record(organizationId, actorId, 'marketing', 'whatsapp_monthly_limit_reached', campaign.recipients.length);
+      throw new BadRequestException('Monthly WhatsApp message limit reached');
+    }
     const availableByMarketing = marketingLimit === null ? campaign.recipients.length : marketingLimit - marketingUsage;
     const availableByTotal = planLimit === null ? campaign.recipients.length : planLimit - usedThisMonth;
     const available = Math.min(campaign.recipients.length, availableByMarketing, availableByTotal);
