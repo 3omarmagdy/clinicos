@@ -1,10 +1,15 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { Cairo } from 'next/font/google';
+import { IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { Providers } from '@/components/providers';
 import './globals.css';
 
-const cairo = Cairo({ subsets: ['arabic', 'latin'], display: 'swap', variable: '--font-clinicos' });
+const plexArabic = IBM_Plex_Sans_Arabic({
+  subsets: ['arabic', 'latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-clinicos',
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://clinicos-crm.vercel.app'),
@@ -47,7 +52,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ar" dir="rtl">
-      <body className={cairo.variable}>
+      <body className={plexArabic.variable}>
         <Providers>{children}</Providers>
       </body>
     </html>
