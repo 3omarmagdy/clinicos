@@ -34,7 +34,7 @@ export class UserController {
   @RequirePermissions('user:update')
   @Patch(':id/password')
   async setTemporaryPassword(@Param('id') id: string, @Body() data: SetTeamMemberPasswordDto, @Req() req: { user: AuthContext }): Promise<{ success: true }> {
-    await this.userService.setTeamMemberPassword(req.user.organizationId, id, data.password, req.user.userId);
+    await this.userService.setTeamMemberPassword(req.user.organizationId, id, data.password, req.user.userId, req.user.role);
     return { success: true };
   }
 }

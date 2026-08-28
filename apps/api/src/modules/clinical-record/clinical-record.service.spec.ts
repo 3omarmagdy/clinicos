@@ -9,12 +9,13 @@ const record = {
   author: { id: 'doctor-a', firstName: 'Dr', lastName: 'A' },
 };
 const subscriptions = { assertCanWrite: jest.fn().mockResolvedValue(undefined), assertLimit: jest.fn().mockResolvedValue(undefined) };
+const audit = { log: jest.fn().mockResolvedValue(undefined) };
 
 describe('ClinicalRecordService', () => {
   it('creates a record only after the patient is found in the authenticated organization', async () => {
     const findFirst = jest.fn().mockResolvedValue({ id: patientId });
     const create = jest.fn().mockResolvedValue(record);
-    const service = new ClinicalRecordService({ patient: { findFirst }, clinicalRecord: { create } } as never, subscriptions as never);
+    const service = new ClinicalRecordService({ patient: { findFirst }, clinicalRecord: { create } } as never, subscriptions as never, audit as never);
 
     await expect(service.create(patientId, organizationId, 'doctor-a', { category: 'clinical_note', content: 'Improving.' })).resolves.toEqual(record);
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ patientId, organizationId, authorId: 'doctor-a' }) }));
@@ -23,7 +24,7 @@ describe('ClinicalRecordService', () => {
   it('lists records scoped to the authenticated organization and patient', async () => {
     const findFirst = jest.fn().mockResolvedValue({ id: patientId });
     const findMany = jest.fn().mockResolvedValue([record]);
-    const service = new ClinicalRecordService({ patient: { findFirst }, clinicalRecord: { findMany } } as never, subscriptions as never);
+    const service = new ClinicalRecordService({ patient: { findFirst }, clinicalRecord: { findMany } } as never, subscriptions as never, audit as never);
 
     await expect(service.list(patientId, organizationId)).resolves.toEqual([record]);
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { patientId, organizationId } }));
@@ -31,7 +32,7 @@ describe('ClinicalRecordService', () => {
 
   it('rejects a record belonging to another organization', async () => {
     const findFirst = jest.fn().mockResolvedValue(null);
-    const service = new ClinicalRecordService({ clinicalRecord: { findFirst } } as never, subscriptions as never);
+    const service = new ClinicalRecordService({ clinicalRecord: { findFirst } } as never, subscriptions as never, audit as never);
 
     await expect(service.get(patientId, 'record-other-org', organizationId)).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -39,18 +40,22 @@ describe('ClinicalRecordService', () => {
   it('does not update a cross-organization record', async () => {
     const findFirst = jest.fn().mockResolvedValue(null);
     const update = jest.fn();
-    const service = new ClinicalRecordService({ clinicalRecord: { findFirst, update } } as never, subscriptions as never);
+    const service = new ClinicalRecordService({ clinicalRecord: { findFirst, update } } as never, subscriptions as never, audit as never);
 
-    await expect(service.update(patientId, 'record-other-org', organizationId, { content: 'Changed' })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.update(patientId, 'record-other-org', organizationId, { content: 'Changed' }, 'doctor-a', 'doctor')).rejects.toBeInstanceOf(NotFoundException);
     expect(update).not.toHaveBeenCalled();
   });
 
   it('updates an in-scope record without changing its author or tenant', async () => {
     const findFirst = jest.fn().mockResolvedValue(record);
     const update = jest.fn().mockResolvedValue({ ...record, content: 'Changed' });
-    const service = new ClinicalRecordService({ clinicalRecord: { findFirst, update } } as never, subscriptions as never);
+    const transaction = jest.fn(async (callback: (tx: unknown) => unknown) => callback({
+      clinicalRecordRevision: { count: jest.fn().mockResolvedValue(0), create: jest.fn().mockResolvedValue(undefined) },
+      clinicalRecord: { update },
+    }));
+    const service = new ClinicalRecordService({ clinicalRecord: { findFirst, update }, $transaction: transaction } as never, subscriptions as never, audit as never);
 
-    await expect(service.update(patientId, record.id, organizationId, { content: 'Changed' })).resolves.toMatchObject({ content: 'Changed' });
+    await expect(service.update(patientId, record.id, organizationId, { content: 'Changed' }, 'doctor-a', 'doctor')).resolves.toMatchObject({ content: 'Changed' });
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: record.id }, data: { content: 'Changed' } }));
   });
 });

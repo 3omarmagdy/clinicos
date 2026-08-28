@@ -18,6 +18,7 @@ type AuthorizedUser = {
   role: string;
   status: string;
   isPlatformAdmin: boolean;
+  sessionVersion: number;
   organization: { subscriptionStatus: string; trialEndsAt: Date | null; subscriptionEndsAt: Date | null };
   userRoles: Array<{ role: { permissions: Array<{ permission: { code: string } }> } }>;
 };
@@ -46,8 +47,8 @@ export class AuthService {
     const email = credentials.email.trim().toLowerCase();
     const organizationSlug = credentials.organizationSlug.trim();
     const { password } = credentials;
-    const failureKeyHash = this.hashCode(`login:${email}:${organizationSlug}:${clientIp}`);
-    await this.assertLoginRate(failureKeyHash);
+    const failureKeyHashes = this.rateKeys('login', `${email}:${organizationSlug}`, clientIp);
+    await this.assertLoginRate(failureKeyHashes, 8, 10 * 60 * 1000);
 
     // Find user by email
     const user = await this.prisma.user.findFirst({
@@ -76,8 +77,8 @@ export class AuthService {
     });
 
     if (!user) {
-      await this.recordLoginFailure(failureKeyHash);
-      this.logger.warn(`Login failed: user not found - ${email}`);
+      await this.recordLoginFailure(failureKeyHashes);
+      this.logger.warn('Login failed: user not found');
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -86,26 +87,37 @@ export class AuthService {
     // Check password
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatch) {
-      await this.recordLoginFailure(failureKeyHash);
-      this.logger.warn(`Login failed: invalid password - ${email}`);
+      await this.recordLoginFailure(failureKeyHashes);
+      this.logger.warn('Login failed: invalid password');
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    await this.prisma.authLoginFailure.deleteMany({ where: { keyHash: failureKeyHash } });
+    await this.prisma.authLoginFailure.deleteMany({ where: { keyHash: { in: failureKeyHashes } } });
     const token = this.issueToken(user);
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-    this.logger.log(`User logged in: ${email}`);
+    this.logger.log(`User logged in: ${user.id}`);
     return token;
   }
 
-  private async assertLoginRate(keyHash: string): Promise<void> {
-    const since = new Date(Date.now() - 10 * 60 * 1000);
-    const failures = await this.prisma.authLoginFailure.count({ where: { keyHash, createdAt: { gte: since } } });
-    if (failures >= 8) throw new UnauthorizedException('Too many login attempts. Try again later.');
+  private rateKeys(action: string, identity: string, clientIp: string): string[] {
+    return [
+      this.hashCode(`${action}:identity:${identity}`),
+      this.hashCode(`${action}:ip:${clientIp || 'unknown'}`),
+      this.hashCode(`${action}:pair:${identity}:${clientIp || 'unknown'}`),
+    ];
   }
 
-  private async recordLoginFailure(keyHash: string): Promise<void> {
-    await this.prisma.authLoginFailure.create({ data: { keyHash } });
+  private async assertLoginRate(keyHashes: string[], limit: number, windowMs: number): Promise<void> {
+    const since = new Date(Date.now() - windowMs);
+    // Each failed request is recorded against the account, IP, and the pair.
+    // Count each dimension independently: summing all three would lock a user
+    // out after only a third of the advertised limit.
+    const counts = await Promise.all(keyHashes.map((keyHash) => this.prisma.authLoginFailure.count({ where: { keyHash, createdAt: { gte: since } } })));
+    if (counts.some((failures) => failures >= limit)) throw new UnauthorizedException('Too many login attempts. Try again later.');
+  }
+
+  private async recordLoginFailure(keyHashes: string[]): Promise<void> {
+    await this.prisma.authLoginFailure.createMany({ data: keyHashes.map((keyHash) => ({ keyHash })) });
   }
 
   private issueToken(user: AuthorizedUser): AuthToken {
@@ -125,6 +137,7 @@ export class AuthService {
       role: user.role,
       permissions: Array.from(permissions),
       isPlatformAdmin: user.isPlatformAdmin,
+      sessionVersion: user.sessionVersion,
     };
 
     return {
@@ -224,7 +237,7 @@ export class AuthService {
     if (consumed.count !== 1) throw new UnauthorizedException('Google login code already used');
     this.assertUserCanSignIn(record.user);
     await this.prisma.user.update({ where: { id: record.user.id }, data: { lastLoginAt: new Date() } });
-    this.logger.log(`User logged in with Google: ${record.user.email}`);
+    this.logger.log(`User logged in with Google: ${record.user.id}`);
     return this.issueToken(record.user);
   }
 
@@ -236,9 +249,17 @@ export class AuthService {
     return this.jwtService.verify(token);
   }
 
-  async requestPasswordReset(data: RequestPasswordResetDto): Promise<{ message: string }> {
+  getSessionHint(token: string): { permissions: string[]; isPlatformAdmin: boolean } {
+    const payload = this.validateToken(token);
+    return { permissions: payload.permissions, isPlatformAdmin: payload.isPlatformAdmin };
+  }
+
+  async requestPasswordReset(data: RequestPasswordResetDto, clientIp = 'unknown'): Promise<{ message: string }> {
     const email = data.email.trim().toLowerCase();
     const genericMessage = 'إذا كانت البيانات صحيحة، ستصلك رسالة استعادة على بريدك الإلكتروني.';
+    const requestKeys = this.rateKeys('password-reset', data.organizationSlug.trim().toLowerCase(), clientIp);
+    await this.assertLoginRate(requestKeys, 5, 15 * 60 * 1000);
+    await this.recordLoginFailure(requestKeys);
     const user = await this.prisma.user.findFirst({
       where: { email, organization: { slug: data.organizationSlug.trim() } },
       select: { id: true, email: true, firstName: true },
@@ -281,14 +302,17 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(data.password, 12);
     await this.prisma.$transaction([
-      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash } }),
+      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash, sessionVersion: { increment: 1 } } }),
       this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
       this.prisma.passwordResetToken.updateMany({ where: { userId: record.userId, usedAt: null, id: { not: record.id } }, data: { usedAt: new Date() } }),
     ]);
     return { message: 'تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن.' };
   }
 
-  async registerClinic(data: RegisterClinicDto): Promise<AuthToken & { organizationSlug: string }> {
+  async registerClinic(data: RegisterClinicDto, clientIp = 'unknown'): Promise<AuthToken & { organizationSlug: string }> {
+    const registrationKeys = this.rateKeys('register-clinic', 'public', clientIp);
+    await this.assertLoginRate(registrationKeys, 3, 60 * 60 * 1000);
+    await this.recordLoginFailure(registrationKeys);
     const clinicName = data.clinicName.trim().replace(/\s+/g, ' ');
     const email = data.email.trim().toLowerCase();
     const baseSlug = clinicName
@@ -351,7 +375,11 @@ export class AuthService {
       throw error;
     }
 
-    const token = await this.login({ email, password: data.password, organizationSlug });
+    const token = await this.login({ email, password: data.password, organizationSlug }, clientIp);
     return { ...token, organizationSlug };
+  }
+
+  async revokeSessions(userId: string): Promise<void> {
+    await this.prisma.user.update({ where: { id: userId }, data: { sessionVersion: { increment: 1 } } });
   }
 }

@@ -4,9 +4,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { ClinicalRecordController } from './clinical-record.controller';
 import { ClinicalRecordService } from './clinical-record.service';
 import { SubscriptionModule } from '../subscription/subscription.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, SubscriptionModule],
+  imports: [PrismaModule, AuthModule, SubscriptionModule, AuditModule],
   controllers: [ClinicalRecordController],
   providers: [ClinicalRecordService],
 })

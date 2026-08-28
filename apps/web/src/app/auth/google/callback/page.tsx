@@ -21,9 +21,8 @@ export default function GoogleCallbackPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code }),
         });
-        const data = await response.json() as { accessToken?: string };
-        if (!response.ok || !data.accessToken) throw new Error('Login failed');
-        setAccessToken(data.accessToken);
+        if (!response.ok) throw new Error('Login failed');
+        setAccessToken();
         window.location.replace('/dashboard');
       } catch {
         setMessage('تعذر إكمال الدخول. تأكد أن بريد Google هو نفس البريد المسجل في هذه العيادة.');
