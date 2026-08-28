@@ -8,6 +8,8 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
+  facilityType: string;
+  specialty: string;
   timezone: string;
   currency: string;
   subscriptionPlan: string;

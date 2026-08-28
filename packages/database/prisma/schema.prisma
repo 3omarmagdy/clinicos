@@ -16,6 +16,8 @@ model Organization {
   id                    String    @id @default(cuid())
   name                  String
   slug                  String    @unique
+  facilityType          String    @default("CLINIC") // CLINIC | HOSPITAL | CENTER | RADIOLOGY_CENTER
+  specialty             String    @default("GENERAL")
   timezone              String    @default("UTC")
   currency              String    @default("EGP")
   subscriptionPlan      String    @default("trial") // trial | clinic | center | enterprise

@@ -1,6 +1,8 @@
-import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class RegisterClinicDto {
+  @IsString() @IsIn(['CLINIC', 'HOSPITAL', 'CENTER', 'RADIOLOGY_CENTER']) facilityType!: string;
+  @IsString() @IsIn(['GENERAL', 'DENTAL', 'SURGERY', 'RADIOLOGY', 'OBGYN', 'OPHTHALMOLOGY', 'UROLOGY', 'BEAUTY']) specialty!: string;
   @IsString() @MinLength(2) @MaxLength(120) clinicName!: string;
   @IsString() @MinLength(2) @MaxLength(80) firstName!: string;
   @IsString() @MinLength(2) @MaxLength(80) lastName!: string;

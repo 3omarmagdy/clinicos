@@ -1,6 +1,12 @@
 import { IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateOrganizationDto {
+  @IsString() @IsIn(['CLINIC', 'HOSPITAL', 'CENTER', 'RADIOLOGY_CENTER'])
+  facilityType!: string;
+
+  @IsString() @IsIn(['GENERAL', 'DENTAL', 'SURGERY', 'RADIOLOGY', 'OBGYN', 'OPHTHALMOLOGY', 'UROLOGY', 'BEAUTY'])
+  specialty!: string;
+
   @IsString()
   @MinLength(2)
   @MaxLength(120)

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { authenticatedFetch, clearAccessToken, getAccessToken, hasSessionPermission, isPlatformAdminSession, signOut } from '@/lib/auth-session';
 
 type CurrentUser = { id: string; email: string; firstName: string; lastName: string; role: string; organizationId: string };
+type OrganizationProfile = { name: string; facilityType: string; specialty: string };
 type DashboardMetrics = { patients: number; consentedPatients: number; newPatientsThisMonth: number; todayAppointments: number; upcomingAppointments: number; todayByStatus: Record<string, number> };
 
 const formatNumber = new Intl.NumberFormat('en-US');
@@ -34,6 +35,7 @@ const roleCopy: Record<string, { eyebrow: string; title: string; description: st
 
 export default function DashboardPage() {
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [organization, setOrganization] = useState<OrganizationProfile | null>(null);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -58,6 +60,8 @@ export default function DashboardPage() {
 
         const currentUser = await userResponse.json() as CurrentUser;
         setUser(currentUser);
+        const organizationResponse = await authenticatedFetch(`/api/v1/organizations/${currentUser.organizationId}`);
+        if (organizationResponse.ok) setOrganization(await organizationResponse.json() as OrganizationProfile);
 
         if (canReadOrganization) {
           const metricsResponse = await authenticatedFetch('/api/v1/organizations/me/dashboard');
@@ -77,6 +81,9 @@ export default function DashboardPage() {
   }
 
   const copy = roleCopy[user.role] ?? roleCopy.admin;
+  const specialtyLabels: Record<string, string> = { GENERAL: 'طب عام', DENTAL: 'أسنان', SURGERY: 'جراحة', RADIOLOGY: 'أشعة', OBGYN: 'نساء وتوليد', OPHTHALMOLOGY: 'عيون وليزك', UROLOGY: 'مسالك بولية', BEAUTY: 'تجميل وبيوتي' };
+  const specialtyActions: Record<string, { patients: string; appointments: string; campaign: string }> = { DENTAL: { patients: 'ملفات مرضى الأسنان', appointments: 'مواعيد الكشف وعلاجات الأسنان', campaign: 'عروض الحشو والخلع وعلاج العصب' }, SURGERY: { patients: 'ملفات الحالات الجراحية', appointments: 'جدول العمليات والاستشارات', campaign: 'عروض العمليات والاستشارات' }, RADIOLOGY: { patients: 'ملفات المراجعين', appointments: 'حجوزات الفحوصات والأشعة', campaign: 'عروض الفحوصات والأشعة' }, OBGYN: { patients: 'ملفات السيدات والحالات', appointments: 'مواعيد النساء والتوليد', campaign: 'عروض خدمات النساء والتوليد' }, OPHTHALMOLOGY: { patients: 'ملفات مرضى العيون', appointments: 'مواعيد العيون والليزك', campaign: 'عروض العيون والليزك' }, UROLOGY: { patients: 'ملفات مرضى المسالك', appointments: 'مواعيد المسالك البولية', campaign: 'عروض المسالك البولية' }, BEAUTY: { patients: 'ملفات عملاء التجميل', appointments: 'مواعيد خدمات البيوتي', campaign: 'عروض التجميل والعناية' }, GENERAL: { patients: 'بيانات المرضى', appointments: 'الحجوزات والاستشارات', campaign: 'العروض الطبية' } };
+  const specialtyAction = specialtyActions[organization?.specialty || 'GENERAL'] || specialtyActions.GENERAL;
   const reception = user.role === 'receptionist';
   const doctor = user.role === 'doctor';
   const owner = ['owner', 'admin'].includes(user.role);
@@ -90,7 +97,7 @@ export default function DashboardPage() {
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#1768a8] text-sm font-black text-white">C</span>
             <div>
               <p className="font-extrabold">Clinicos</p>
-              <p className="text-xs text-slate-500">مساحة عمل العيادة</p>
+              <p className="text-xs text-slate-500">{organization?.name || 'مساحة عمل العيادة'}{organization?.specialty ? ` · ${specialtyLabels[organization.specialty] || organization.specialty}` : ''}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -124,12 +131,12 @@ export default function DashboardPage() {
             <p className="text-xs font-extrabold tracking-[.14em] text-[#1768a8]">YOUR NEXT ACTION</p>
             <h2 className="mt-2 text-xl font-extrabold">ماذا تريد أن تفعل؟</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <Action href="/appointments" title={doctor ? 'جدول اليوم' : 'الحجوزات والاستشارات'} text={doctor ? 'راجع مواعيدك وحالة حضور كل مريض.' : 'احجز موعدًا جديدًا وتابع حالة الحضور والاستشارة.'} primary />
-              <Action href="/patients" title={reception ? 'بيانات المرضى' : doctor ? 'ملفات المرضى والسجل الطبي' : 'إدارة المرضى'} text={reception ? 'سجّل مريضًا جديدًا أو افتح ملفًا موجودًا.' : doctor ? 'افتح الملف لتسجيل الملاحظات أو الوصفة.' : 'عرض وتحديث ملفات المرضى.'} />
+              <Action href="/appointments" title={doctor ? 'جدول اليوم' : specialtyAction.appointments} text={doctor ? 'راجع مواعيدك وحالة حضور كل مريض.' : 'احجز موعدًا جديدًا وتابع حالة الحضور والاستشارة.'} primary />
+              <Action href="/patients" title={reception ? specialtyAction.patients : doctor ? 'ملفات المرضى والسجل الطبي' : specialtyAction.patients} text={reception ? 'سجّل مريضًا جديدًا أو افتح ملفًا موجودًا.' : doctor ? 'افتح الملف لتسجيل الملاحظات أو الوصفة.' : 'عرض وتحديث ملفات المرضى.'} />
               {owner && <Action href="/team" title="فريق العيادة" text="أضف أعضاء الفريق وحدد دور كل شخص." tone="teal" />}
               {owner && <Action href="/settings" title="إعدادات العيادة" text="اضبط اسم العيادة وبيانات التشغيل والطباعة." />}
               {owner && <Action href="/settings/subscription" title="الاشتراك والفوترة" text="راجع خطتك وحدود الاستخدام وطلبات التفعيل." tone="teal" />}
-              {owner && <Action href="/campaigns" title="عروض WhatsApp" text="أنشئ عرضًا للمرضى الموافقين وراجعه قبل الإرسال." tone="teal" />}
+              {owner && <Action href="/campaigns" title="عروض WhatsApp" text={`${specialtyAction.campaign} — راجع المستلمين قبل الإرسال.`} tone="teal" />}
               {doctor && <Action href="/patients" title="الوصفة الإلكترونية" text="افتح ملف المريض ثم أنشئ وصفة قابلة للطباعة." tone="teal" />}
             </div>
           </div>

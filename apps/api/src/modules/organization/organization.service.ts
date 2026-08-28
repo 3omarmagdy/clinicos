@@ -34,6 +34,8 @@ export class OrganizationService {
       where: { id: organizationId },
       data: {
         name: data.name.trim(),
+        facilityType: data.facilityType,
+        specialty: data.specialty,
         timezone: data.timezone,
         currency: data.currency,
         prescriptionHeader: data.prescriptionHeader?.trim() || null,
