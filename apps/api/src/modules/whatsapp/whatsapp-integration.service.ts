@@ -26,6 +26,7 @@ type IntegrationInput = {
 };
 
 type EncryptedValue = { ciphertext: string; iv: string; authTag: string };
+type MetaGraphResponse = { ok: boolean; json(): Promise<unknown> };
 type IntegrationRecord = {
   organizationId: string;
   phoneNumberId: string;
@@ -81,7 +82,7 @@ export class WhatsAppIntegrationService {
   private async validateWithMeta(input: IntegrationInput): Promise<void> {
     const apiVersion = input.apiVersion?.trim() || 'v26.0';
     try {
-      const response = await fetch(`https://graph.facebook.com/${apiVersion}/${encodeURIComponent(input.phoneNumberId.trim())}?fields=id,whatsapp_business_account`, { headers: { Authorization: `Bearer ${input.accessToken}` } });
+      const response = await fetch(`https://graph.facebook.com/${apiVersion}/${encodeURIComponent(input.phoneNumberId.trim())}?fields=id,whatsapp_business_account`, { headers: { Authorization: `Bearer ${input.accessToken}` } }) as unknown as MetaGraphResponse;
       const body = await response.json() as { id?: string; whatsapp_business_account?: { id?: string }; error?: { code?: number } };
       if (!response.ok || body.id !== input.phoneNumberId.trim() || body.whatsapp_business_account?.id !== input.wabaId.trim()) throw new Error(`Meta validation failed${body.error?.code ? ` (${body.error.code})` : ''}`);
     } catch {
