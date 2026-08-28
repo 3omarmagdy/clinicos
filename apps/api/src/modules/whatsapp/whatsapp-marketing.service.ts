@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { CreateMarketingCampaignDto, MarketingCampaignFiltersDto, SendMarketingCampaignDto } from './marketing.dto';
-import { PLAN_CATALOG } from '../subscription/subscription.service';
+import { PLAN_CATALOG, SubscriptionService } from '../subscription/subscription.service';
 import { MessagingQuotaGuardService } from './messaging-quota-guard.service';
 
 type ProviderResponse = { ok: boolean; status: number; json(): Promise<unknown> };
@@ -13,7 +13,7 @@ type DeliveryResult = { recipientId: string; patientId: string; status: 'sent' |
 export class WhatsAppMarketingService {
   private readonly logger = new Logger('WhatsAppMarketingService');
 
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly quotaGuard: MessagingQuotaGuardService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly quotaGuard: MessagingQuotaGuardService, private readonly subscriptions: SubscriptionService) {}
 
   async list(organizationId: string) {
     return this.prisma.marketingCampaign.findMany({
@@ -39,6 +39,7 @@ export class WhatsAppMarketingService {
   }
 
   async preview(organizationId: string, filters: MarketingCampaignFiltersDto) {
+    await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
     const patients = await this.prisma.patient.findMany({
       where: this.audienceWhere(organizationId, filters),
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
@@ -50,6 +51,7 @@ export class WhatsAppMarketingService {
   }
 
   async create(organizationId: string, actorId: string, data: CreateMarketingCampaignDto) {
+    await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
     const config = this.configuration();
     if (!config) throw new BadRequestException('WhatsApp marketing template is not configured or approved yet');
 
@@ -91,6 +93,7 @@ export class WhatsAppMarketingService {
 
   async send(organizationId: string, actorId: string, campaignId: string, data: SendMarketingCampaignDto) {
     if (!data.confirm) throw new BadRequestException('Explicit confirmation is required before sending');
+    await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
     await this.quotaGuard.assertNotBlocked(organizationId, actorId, 'marketing');
     const config = this.configuration();
     if (!config) throw new BadRequestException('WhatsApp marketing template is not configured or approved yet');

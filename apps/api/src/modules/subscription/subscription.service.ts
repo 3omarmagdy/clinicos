@@ -86,6 +86,17 @@ export class SubscriptionService {
     if (['EXPIRED', 'PAST_DUE', 'CANCELED'].includes(subscription.status)) throw new ForbiddenException('Your trial or subscription has ended. You can still view your data, but new changes require an active plan.');
   }
 
+  async assertFeatureAccess(organizationId: string, feature: 'marketing' | 'whatsapp'): Promise<void> {
+    const subscription = await this.resolveStatus(organizationId);
+    if (['EXPIRED', 'PAST_DUE', 'CANCELED'].includes(subscription.status)) throw new ForbiddenException('This feature requires an active subscription.');
+    if (subscription.plan === 'FREE_TRIAL') {
+      const message = feature === 'marketing'
+        ? 'Marketing tools are available after activating a paid plan.'
+        : 'WhatsApp messaging is not enabled during the free trial.';
+      throw new ForbiddenException(message);
+    }
+  }
+
   async assertLimit(organizationId: string, key: LimitKey, additional = 1): Promise<void> {
     await this.assertCanWrite(organizationId);
     const subscription = await this.resolveStatus(organizationId);
