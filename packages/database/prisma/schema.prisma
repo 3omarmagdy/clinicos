@@ -80,6 +80,15 @@ enum PaymentStatus {
 /// One current subscription is maintained per tenant. Historical changes are
 /// retained as SubscriptionEvent records, so billing can evolve without
 /// exposing sensitive payment information to clinic users.
+model AuthLoginFailure {
+  id        String   @id @default(cuid())
+  keyHash   String
+  createdAt DateTime @default(now())
+
+  @@index([keyHash, createdAt])
+  @@map("auth_login_failures")
+}
+
 model PasswordResetToken {
   id        String    @id @default(cuid())
   userId    String

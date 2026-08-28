@@ -3,11 +3,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { Organization, CreateOrganizationDTO } from '@clinicos/shared-types';
 import type { UpdateOrganizationDto } from './organization.dto';
 import { AuditService } from '../audit/audit.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()
 export class OrganizationService {
 
-  constructor(private prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private prisma: PrismaService, private readonly audit: AuditService, private readonly subscriptions: SubscriptionService) {}
 
   async getOrganization(id: string, organizationId: string): Promise<Organization | null> {
     if (id !== organizationId) {
@@ -27,6 +28,7 @@ export class OrganizationService {
 
   async updateOrganization(id: string, organizationId: string, data: UpdateOrganizationDto, actorId?: string): Promise<Organization | null> {
     if (id !== organizationId) return null;
+    await this.subscriptions.assertCanWrite(organizationId);
 
     const organization = await this.prisma.organization.update({
       where: { id: organizationId },

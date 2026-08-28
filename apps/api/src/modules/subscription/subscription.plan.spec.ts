@@ -1,4 +1,4 @@
-import { PLAN_CATALOG } from './subscription.service';
+import { PLAN_CATALOG, SubscriptionService } from './subscription.service';
 
 describe('PLAN_CATALOG WhatsApp entitlements', () => {
   it('keeps the approved monthly prices', () => {
@@ -15,6 +15,20 @@ describe('PLAN_CATALOG WhatsApp entitlements', () => {
 
   it('does not grant WhatsApp during the free trial', () => {
     expect(PLAN_CATALOG.FREE_TRIAL).toMatchObject({ whatsappMonthlyMessages: 0, whatsappUtilityMessages: 0, whatsappMarketingMessages: 0 });
+  });
+
+  it('rejects Marketing access during the free trial', async () => {
+    const prisma = { subscription: { findFirst: jest.fn().mockResolvedValue({ plan: 'FREE_TRIAL', status: 'TRIALING', trialEndsAt: new Date(Date.now() + 86_400_000), currentPeriodEnd: null }) } };
+    const service = new SubscriptionService(prisma as never, {} as never, {} as never);
+
+    await expect(service.assertFeatureAccess('org-1', 'marketing')).rejects.toThrow('paid plan');
+  });
+
+  it('allows paid WhatsApp access while the subscription is active', async () => {
+    const prisma = { subscription: { findFirst: jest.fn().mockResolvedValue({ plan: 'STARTER', status: 'ACTIVE', trialEndsAt: null, currentPeriodEnd: new Date(Date.now() + 86_400_000) }) } };
+    const service = new SubscriptionService(prisma as never, {} as never, {} as never);
+
+    await expect(service.assertFeatureAccess('org-1', 'whatsapp')).resolves.toBeUndefined();
   });
 
   it('keeps Center custom and unlimited', () => {

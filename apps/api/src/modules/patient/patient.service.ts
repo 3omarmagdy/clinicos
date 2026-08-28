@@ -190,6 +190,7 @@ export class PatientService {
   }
 
   async marketingAudience(organizationId: string, filters: MarketingAudienceQueryDto) {
+    await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
     const where = this.audienceWhere(organizationId, filters);
     const [total, samples] = await Promise.all([
       this.prisma.patient.count({ where }),
@@ -204,6 +205,7 @@ export class PatientService {
   }
 
   async exportMarketingAudience(organizationId: string, filters: MarketingAudienceQueryDto, actorId?: string) {
+    await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
     const audience = await this.prisma.patient.findMany({
       where: this.audienceWhere(organizationId, filters),
       orderBy: { createdAt: 'asc' },

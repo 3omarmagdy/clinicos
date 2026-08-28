@@ -1,5 +1,5 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import { BadRequestException, Body, Controller, Get, Post, Query, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import type { LoginCredentials, AuthToken } from '@clinicos/shared-types';
 import { RegisterClinicDto } from './dto/register-clinic.dto';
@@ -10,20 +10,23 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
-  async login(@Body() credentials: LoginCredentials): Promise<AuthToken> {
+  async login(@Body() credentials: LoginCredentials, @Req() request: Request): Promise<AuthToken> {
     if (
       !credentials ||
       typeof credentials.email !== 'string' ||
       typeof credentials.password !== 'string' ||
       typeof credentials.organizationSlug !== 'string' ||
       !credentials.email.trim() ||
+      credentials.email.length > 254 ||
       !credentials.password ||
-      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(credentials.organizationSlug)
+      credentials.password.length > 128 ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(credentials.organizationSlug) ||
+      credentials.organizationSlug.length > 80
     ) {
       throw new BadRequestException('Email, password, and clinic code are required');
     }
 
-    return this.authService.login(credentials);
+    return this.authService.login(credentials, request.ip);
   }
 
   @Post('forgot-password')
