@@ -45,6 +45,7 @@ model Organization {
   subscriptions   Subscription[]
   payments        Payment[]
   subscriptionEvents SubscriptionEvent[]
+  messagingQuotaViolations MessagingQuotaViolation[]
 
   @@map("organizations")
 }
@@ -256,6 +257,25 @@ model MarketingCampaignRecipient {
   @@map("marketing_campaign_recipients")
 }
 
+model MessagingQuotaViolation {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorId        String?
+  channel        String   // utility | marketing
+  reason         String
+  attemptedCount Int      @default(1)
+  blockedUntil   DateTime?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, channel, createdAt])
+  @@index([organizationId, actorId, createdAt])
+  @@index([blockedUntil])
+  @@map("messaging_quota_violations")
+}
+
 // ============================================================================
 // APPOINTMENTS
 // ============================================================================
@@ -428,6 +448,7 @@ model User {
   reviewedPayments        Payment[]        @relation("PaymentReviewer")
   subscriptionEvents      SubscriptionEvent[] @relation("SubscriptionEventActor")
   createdMarketingCampaigns MarketingCampaign[]
+  messagingQuotaViolations MessagingQuotaViolation[]
 
   @@unique([organizationId, email])
   @@index([organizationId, email])
