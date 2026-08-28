@@ -64,11 +64,13 @@ describe('WhatsAppService', () => {
     const payload = { object: 'whatsapp_business_account', entry: [{ changes: [{ value: { metadata: { phone_number_id: 'phone-number-id' }, statuses: [{ id: 'wamid.test-1', status: 'delivered', timestamp: '1750030073' }] } }] }] };
     const rawBody = Buffer.from(JSON.stringify(payload));
     const signature = `sha256=${createHmac('sha256', 'app-secret').update(rawBody).digest('hex')}`;
-    const prisma = { whatsAppMessage: { findUnique: jest.fn().mockResolvedValue({ id: 'message-1', status: 'SENT' }), update: jest.fn().mockResolvedValue({}) } };
+    const prisma = { whatsAppMessage: { findUnique: jest.fn().mockResolvedValueOnce({ id: 'message-1', status: 'SENT' }).mockResolvedValue({ id: 'message-1', status: 'DELIVERED' }), update: jest.fn().mockResolvedValue({}) } };
     const service = new WhatsAppService(prisma as never);
 
     await expect(service.handleWebhook(payload, rawBody, signature)).resolves.toEqual({ processed: 1, ignored: 0 });
     expect(prisma.whatsAppMessage.update).toHaveBeenCalledWith({ where: { id: 'message-1' }, data: { status: 'DELIVERED', deliveredAt: new Date(1750030073 * 1000) } });
+    await expect(service.handleWebhook(payload, rawBody, signature)).resolves.toEqual({ processed: 1, ignored: 0 });
+    expect(prisma.whatsAppMessage.update).toHaveBeenCalledTimes(1);
   });
 
   it('ignores a valid webhook for an unknown provider message id', async () => {

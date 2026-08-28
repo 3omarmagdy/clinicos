@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { CreateMarketingCampaignDto, MarketingCampaignFiltersDto, SendMarketingCampaignDto } from './marketing.dto';
 import { PLAN_CATALOG, SubscriptionService } from '../subscription/subscription.service';
 import { MessagingQuotaGuardService } from './messaging-quota-guard.service';
+import { WhatsAppIntegrationService } from './whatsapp-integration.service';
 
 type ProviderResponse = { ok: boolean; status: number; json(): Promise<unknown> };
 type DeliveryResult = { recipientId: string; patientId: string; status: 'sent' | 'failed' | 'skipped'; reason?: string; messageId?: string };
@@ -13,7 +14,7 @@ type DeliveryResult = { recipientId: string; patientId: string; status: 'sent' |
 export class WhatsAppMarketingService {
   private readonly logger = new Logger('WhatsAppMarketingService');
 
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly quotaGuard: MessagingQuotaGuardService, private readonly subscriptions: SubscriptionService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly quotaGuard: MessagingQuotaGuardService, private readonly subscriptions: SubscriptionService, @Optional() private readonly integrations?: WhatsAppIntegrationService) {}
 
   async list(organizationId: string) {
     return this.prisma.marketingCampaign.findMany({
@@ -52,8 +53,8 @@ export class WhatsAppMarketingService {
 
   async create(organizationId: string, actorId: string, data: CreateMarketingCampaignDto) {
     await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
-    const config = this.configuration(false);
-    if (!config) throw new BadRequestException('WhatsApp marketing template is not configured yet');
+    const config = await this.configuration(organizationId, false);
+    if (!config || !config.template) throw new BadRequestException('WhatsApp marketing template is not configured yet');
 
     const where = this.audienceWhere(organizationId, data);
     const eligiblePatients = await this.prisma.patient.findMany({
@@ -95,8 +96,9 @@ export class WhatsAppMarketingService {
     if (!data.confirm) throw new BadRequestException('Explicit confirmation is required before sending');
     await this.subscriptions.assertFeatureAccess(organizationId, 'marketing');
     await this.quotaGuard.assertNotBlocked(organizationId, actorId, 'marketing');
-    const config = this.configuration(true);
-    if (!config) throw new BadRequestException('WhatsApp marketing sending is disabled or the template is not configured/approved yet');
+    const config = await this.configuration(organizationId, true);
+    if (!config || !config.template) throw new BadRequestException('WhatsApp marketing sending is disabled or the template is not configured/approved yet');
+    const sendConfig = { ...config, template: config.template };
 
     const campaign = await this.prisma.marketingCampaign.findFirst({
       where: { id: campaignId, organizationId },
@@ -137,7 +139,7 @@ export class WhatsAppMarketingService {
 
     await this.prisma.marketingCampaign.update({ where: { id: campaign.id }, data: { status: 'SENDING', startedAt: campaign.startedAt ?? new Date() } });
     const results: DeliveryResult[] = [];
-    for (const recipient of recipients) results.push(await this.sendRecipient({ ...campaign, organizationName: campaign.organization.name }, recipient, config));
+    for (const recipient of recipients) results.push(await this.sendRecipient({ ...campaign, organizationName: campaign.organization.name }, recipient, sendConfig));
 
     const pending = await this.prisma.marketingCampaignRecipient.count({ where: { campaignId: campaign.id, status: 'PENDING' } });
     const sent = results.filter((result) => result.status === 'sent').length;
@@ -256,7 +258,13 @@ export class WhatsAppMarketingService {
     return PLAN_CATALOG[normalized]?.whatsappMarketingMessages ?? 0;
   }
 
-  private configuration(requireEnabled = false) {
+  private async configuration(organizationId: string, requireEnabled = false) {
+    if (this.integrations) {
+      const integration = await this.integrations.getForOrganization(organizationId);
+      if (!integration || (requireEnabled && (!integration.enabled || process.env.WHATSAPP_SEND_ENABLED !== 'true'))) return null;
+      return { accessToken: integration.accessToken, phoneNumberId: integration.phoneNumberId, template: integration.marketingTemplate, language: integration.templateLanguage, apiVersion: integration.apiVersion };
+    }
+    if (process.env.NODE_ENV !== 'test') return null;
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     const template = process.env.WHATSAPP_MARKETING_TEMPLATE;

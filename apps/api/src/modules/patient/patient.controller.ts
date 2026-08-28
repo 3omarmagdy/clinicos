@@ -42,6 +42,12 @@ export class PatientController {
     return this.patients.import(req.user.organizationId, data.patients, req.user.userId);
   }
 
+  @Post(':id/whatsapp-reminders-opt-out') @RequirePermissions('patient:update')
+  disableWhatsAppReminders(@Param('id') id: string, @Req() req: { user: AuthContext }): Promise<Patient> { return this.patients.disableWhatsAppReminders(id, req.user.organizationId, req.user.userId); }
+
+  @Post(':id/whatsapp-marketing-opt-out') @RequirePermissions('patient:update')
+  disableWhatsAppMarketing(@Param('id') id: string, @Req() req: { user: AuthContext }): Promise<Patient> { return this.patients.disableWhatsAppMarketing(id, req.user.organizationId, req.user.userId); }
+
   @Post(':id/whatsapp-opt-out') @RequirePermissions('patient:update')
   disableWhatsApp(@Param('id') id: string, @Req() req: { user: AuthContext }): Promise<Patient> { return this.patients.disableWhatsApp(id, req.user.organizationId, req.user.userId); }
 

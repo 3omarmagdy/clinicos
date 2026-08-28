@@ -7,11 +7,12 @@ import { WhatsAppController } from './whatsapp.controller';
 import { WhatsAppMarketingService } from './whatsapp-marketing.service';
 import { WhatsAppService } from './whatsapp.service';
 import { MessagingQuotaGuardService } from './messaging-quota-guard.service';
+import { WhatsAppIntegrationService } from './whatsapp-integration.service';
 
 @Module({
   imports: [PrismaModule, AuthModule, AuditModule, SubscriptionModule],
   controllers: [WhatsAppController],
-  providers: [WhatsAppService, WhatsAppMarketingService, MessagingQuotaGuardService],
-  exports: [WhatsAppService, WhatsAppMarketingService, MessagingQuotaGuardService],
+  providers: [WhatsAppService, WhatsAppMarketingService, MessagingQuotaGuardService, WhatsAppIntegrationService],
+  exports: [WhatsAppService, WhatsAppMarketingService, MessagingQuotaGuardService, WhatsAppIntegrationService],
 })
 export class WhatsAppModule {}
