@@ -165,13 +165,13 @@ export default function SubscriptionPage() {
               <span className="rounded-full bg-[#edf6ff] px-4 py-2 text-xs font-bold text-[#176b9d]">تفعيل بعد المراجعة</span>
             </div>
             <div className="mt-5 grid gap-4 lg:grid-cols-3">
-              <PaymentMethodCard logo="/payment/instapay.webp" alt="InstaPay" title="InstaPay" actionLabel={instructions.instapayLink ? 'فتح رابط الدفع' : 'فتح InstaPay'} href={instructions.instapayLink || 'https://www.instapay.eg/'} />
+              <PaymentMethodCard logo="/payment/instapay.webp" alt="InstaPay" title="InstaPay" actionLabel="الدفع عبر InstaPay" href={instructions.instapayLink} emptyLabel="لم يتم ضبط رابط الدفع بعد" />
               <PaymentMethodCard logo="/payment/nbe.png" alt={instructions.bankName || 'البنك'} title="تحويل بنكي" actionLabel="عرض تفاصيل التحويل" onClick={() => setShowBankDetails(true)} />
-              <PaymentMethodCard logo="/payment/emoney.jpg" alt="e& money" title="محفظة e& money" actionLabel="فتح تطبيق e& money" href={instructions.emoneyAppLink} />
+              <PaymentMethodCard logo="/payment/emoney.jpg" alt="e& money" title="محفظة e& money" actionLabel="الدفع عبر تطبيق e& money" href={instructions.emoneyAppLink} emptyLabel="لم يتم ضبط رابط التطبيق بعد" />
             </div>
             {showBankDetails && <div id="bank-details" className="mt-5 rounded-2xl border border-[#b9d9ee] bg-[#f7fafc] p-4"><div className="flex items-center justify-between gap-3"><h3 className="font-black text-[#153c63]">تفاصيل التحويل البنكي</h3><button type="button" onClick={() => setShowBankDetails(false)} className="text-sm font-bold text-[#176b9d]">إخفاء</button></div><div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{detail('البنك', instructions.bankName)}{detail('اسم المستفيد', instructions.accountName)}{detail('رقم الحساب', instructions.accountNumber)}{detail('IBAN', instructions.iban)}{detail('SWIFT / BIC (اختياري)', instructions.swiftCode)}</div></div>}
             {!instructions.bankName && !instructions.accountNumber && !instructions.iban && !instructions.instapayAddress && !instructions.emoneyPhone && <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">سيتم تفعيل وسائل الدفع بعد ضبط بياناتها من الإدارة.</p>}
-            <p className="mt-5 text-sm leading-6 text-slate-600">اختر وسيلة الدفع المناسبة. لن تظهر بيانات الحساب في البداية؛ تظهر تفاصيل البنك فقط عند اختيار «تحويل بنكي». بعد التحويل، أدخل رقم العملية أو المرجع فقط في النموذج أدناه.</p>
+            <p className="mt-5 text-sm leading-6 text-slate-600">اختر وسيلة الدفع المناسبة. لن تظهر بيانات الحساب في البداية؛ تظهر تفاصيل البنك فقط عند اختيار «تحويل بنكي». سيتم فتح تطبيق الدفع فقط عند ضبط رابط رسمي له من الإدارة، وبعد التحويل أدخل رقم العملية أو المرجع في النموذج أدناه.</p>
             <div className="mt-4 rounded-xl bg-[#12395e] p-4 text-sm leading-6 text-white"><strong>مراجعة الطلب:</strong> {instructions.reviewWindow}<br /><span className="text-blue-100">{instructions.note}</span></div>
           </section>
 
@@ -198,7 +198,7 @@ export default function SubscriptionPage() {
 }
 
 
-function PaymentMethodCard({ logo, alt, title, actionLabel, href, onClick }: { logo: string; alt: string; title: string; actionLabel: string; href?: string; onClick?: () => void }) {
-  const content = <><span className="flex h-24 items-center justify-center rounded-xl bg-white p-3 ring-1 ring-slate-200"><img src={logo} alt={alt} className="h-16 w-32 object-contain" /></span><h3 className="mt-5 text-center text-lg font-black text-[#153c63]">{title}</h3><span className="mt-4 inline-flex items-center justify-center rounded-lg bg-[#176b9d] px-4 py-2.5 text-xs font-black text-white">{actionLabel}</span></>;
-  return <article className="rounded-2xl border border-[#dce7f1] bg-[#f7fafc] p-5">{href ? <a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined} className="block rounded-xl outline-none focus:ring-2 focus:ring-[#8fc2df]">{content}</a> : <button type="button" onClick={onClick} className="block w-full rounded-xl text-right outline-none focus:ring-2 focus:ring-[#8fc2df]">{content}</button>}</article>;
+function PaymentMethodCard({ logo, alt, title, actionLabel, href, onClick, emptyLabel }: { logo: string; alt: string; title: string; actionLabel: string; href?: string; onClick?: () => void; emptyLabel?: string }) {
+  const content = <><span className="flex h-24 items-center justify-center rounded-xl bg-white p-3 ring-1 ring-slate-200"><img src={logo} alt={alt} className="h-16 w-32 object-contain" /></span><h3 className="mt-5 text-center text-lg font-black text-[#153c63]">{title}</h3>{href ? <span className="mt-4 inline-flex items-center justify-center rounded-lg bg-[#176b9d] px-4 py-2.5 text-xs font-black text-white">{actionLabel}</span> : <span className="mt-4 inline-flex items-center justify-center rounded-lg bg-slate-200 px-4 py-2.5 text-xs font-bold text-slate-500">{emptyLabel || 'غير متاح حاليًا'}</span>}</>;
+  return <article className="rounded-2xl border border-[#dce7f1] bg-[#f7fafc] p-5">{href ? <a href={href} className="block rounded-xl outline-none focus:ring-2 focus:ring-[#8fc2df]">{content}</a> : <button type="button" onClick={onClick} className="block w-full rounded-xl text-right outline-none focus:ring-2 focus:ring-[#8fc2df]">{content}</button>}</article>;
 }
