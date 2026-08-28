@@ -59,7 +59,7 @@ export class SubscriptionService {
       instapayAddress: process.env.PAYMENT_INSTAPAY_ADDRESS || '',
       instapayLink: process.env.PAYMENT_INSTAPAY_LINK || '',
       emoneyPhone: process.env.PAYMENT_EMONEY_PHONE || '',
-      emoneyAppLink: process.env.PAYMENT_EMONEY_APP_LINK || 'https://flous.page.link/eAndMoney',
+      emoneyAppLink: process.env.PAYMENT_EMONEY_APP_LINK || '',
       reviewWindow: process.env.PAYMENT_REVIEW_WINDOW || 'تتم مراجعة الطلب خلال أيام العمل بعد التحقق من التحويل.',
       note: process.env.PAYMENT_INSTRUCTIONS_NOTE || 'لا ترسل كلمة المرور أو PIN أو OTP أو بيانات البطاقة. أدخل رقم العملية فقط.',
     };
