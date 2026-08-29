@@ -3,7 +3,7 @@ import Link from 'next/link';
 export function BrandMark({ href = '/', light = false }: { href?: string; light?: boolean }) {
   return (
     <Link href={href} className="inline-flex items-center gap-3" aria-label="Clinicos home">
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-teal-300 via-teal-400 to-cyan-500 shadow-sm shadow-teal-500/30">
+      <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[#0b1f33] via-[#1268a6] to-[#10afa3] shadow-sm shadow-cyan-950/30">
         <svg
           viewBox="0 0 24 24"
           className="h-6 w-6"
@@ -12,26 +12,20 @@ export function BrandMark({ href = '/', light = false }: { href?: string; light?
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <circle cx="8.5" cy="12" r="5.5" className="text-slate-950" strokeWidth="1.6" opacity="0.9" />
-          <circle cx="15.5" cy="12" r="5.5" className="text-slate-950" strokeWidth="1.6" opacity="0.45" />
-          <path
-            className="text-white"
-            strokeWidth="2"
-            d="M3.5 12h3l2-5 3 10 2-5h4"
-          />
+          <path className="text-white" strokeWidth="1.75" d="m12 2.8 3.2 1.85v3.7l-3.2 1.85-3.2-1.85v-3.7L12 2.8Zm0 10.9 3.2 1.85v3.7L12 21.1l-3.2-1.85v-3.7L12 13.7Zm-9.1-5.35 3.2-1.85 3.2 1.85v3.7l-3.2 1.85-3.2-1.85v-3.7Zm18.2 0-3.2-1.85-3.2 1.85v3.7l3.2 1.85 3.2-1.85v-3.7Z" />
         </svg>
       </span>
       <span>
         <span
           className={`block text-lg font-bold tracking-tight ${
-            light ? 'text-white' : 'text-slate-950'
+            light ? 'text-white' : 'text-[#0b1f33]'
           }`}
         >
           Clinicos
         </span>
         <span
           className={`block text-[10px] font-semibold uppercase tracking-[0.18em] ${
-            light ? 'text-teal-200' : 'text-teal-700'
+            light ? 'text-teal-200' : 'text-[#0d8d86]'
           }`}
         >
           connected care

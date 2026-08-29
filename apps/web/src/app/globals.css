@@ -4,7 +4,7 @@
 
 @layer components {
   .field {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#4f97d0] focus:ring-4 focus:ring-blue-100;
+    @apply w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#10afa3] focus:ring-4 focus:ring-teal-100;
   }
 }
 
@@ -13,8 +13,8 @@ html {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900;
-  font-family: var(--font-clinicos), "Segoe UI", Tahoma, Arial, sans-serif;
+  @apply bg-[#f4f8fb] text-[#102840];
+  font-family: var(--font-clinicos), Inter, "Segoe UI", Tahoma, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -26,6 +26,12 @@ body {
 
 :root {
   color-scheme: light;
+  --clinicos-navy: #0b1f33;
+  --clinicos-blue: #1268a6;
+  --clinicos-teal: #10afa3;
+  --clinicos-ice: #dff7f3;
+  --clinicos-canvas: #f4f8fb;
+  --clinicos-line: #dce7ef;
 }
 
 @media print {
@@ -34,13 +40,17 @@ body {
   body { background: white !important; }
 }
 
-/* Healthcare theme colors */
-:root {
-  --primary-50: #f0f9ff;
-  --primary-500: #0ea5e9;
-  --primary-600: #0284c7;
-  --primary-700: #0369a1;
-  --success-500: #10b981;
-  --warning-500: #f59e0b;
-  --error-500: #ef4444;
+.clinicos-grid {
+  background-image: linear-gradient(rgba(18, 104, 166, .045) 1px, transparent 1px), linear-gradient(90deg, rgba(18, 104, 166, .045) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+
+.clinicos-shell {
+  background: radial-gradient(circle at 80% -10%, rgba(16, 175, 163, .10), transparent 28rem), var(--clinicos-canvas);
+}
+
+.clinicos-card {
+  border: 1px solid var(--clinicos-line);
+  background: #fff;
+  box-shadow: 0 12px 34px -28px rgba(11, 31, 51, .45);
 }
