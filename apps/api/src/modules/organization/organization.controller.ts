@@ -12,6 +12,13 @@ export class OrganizationController {
 
   @UseGuards(AuthGuard('jwt'), PermissionsGuard)
   @RequirePermissions('organization:read')
+  @Get('me/services')
+  async services(@Req() req: { user: AuthContext }) {
+    return this.organizationService.listServices(req.user.organizationId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:read')
   @Get(':id')
   async getOrganization(
     @Param('id') id: string,

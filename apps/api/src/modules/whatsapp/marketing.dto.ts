@@ -12,6 +12,7 @@ export class MarketingCampaignFiltersDto {
 }
 
 export class CreateMarketingCampaignDto extends MarketingCampaignFiltersDto {
+  @IsOptional() @IsString() @MaxLength(80) serviceId?: string;
   @IsString() @MinLength(1) @MaxLength(500) offerText!: string;
   @IsOptional() @IsDateString() expiresAt?: string;
 }

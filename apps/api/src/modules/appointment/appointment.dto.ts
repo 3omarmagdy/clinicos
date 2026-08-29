@@ -25,6 +25,11 @@ export class CreateAppointmentDto {
   @MaxLength(80)
   doctorId?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  serviceId?: string;
+
   @IsDateString()
   scheduledAt!: string;
 

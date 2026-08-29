@@ -56,6 +56,8 @@ export class WhatsAppMarketingService {
     const config = await this.configuration(organizationId, false);
     if (!config || !config.template) throw new BadRequestException('WhatsApp marketing template is not configured yet');
 
+    const service = data.serviceId ? await this.prisma.service.findFirst({ where: { id: data.serviceId, organizationId, isActive: true }, select: { id: true } }) : null;
+    if (data.serviceId && !service) throw new BadRequestException('Selected service is not active in this clinic');
     const where = this.audienceWhere(organizationId, data);
     const eligiblePatients = await this.prisma.patient.findMany({
       where,
@@ -69,6 +71,7 @@ export class WhatsAppMarketingService {
     const campaign = await this.prisma.marketingCampaign.create({
       data: {
         organizationId,
+        serviceId: service?.id,
         createdById: actorId,
         templateName: config.template,
         offerText: data.offerText.trim(),

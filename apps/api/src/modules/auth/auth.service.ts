@@ -344,7 +344,7 @@ export class AuthService {
           await tx.permission.upsert({ where: { code }, update: {}, create: { code, category } });
         }
         const organization = await tx.organization.create({
-          data: { name: clinicName, slug: organizationSlug, timezone: 'Africa/Cairo', currency: 'EGP', subscriptionPlan: 'trial', subscriptionStatus: 'trial', trialEndsAt },
+          data: { name: clinicName, slug: organizationSlug, facilityType: data.facilityType, specialty: data.specialty, timezone: 'Africa/Cairo', currency: 'EGP', subscriptionPlan: 'trial', subscriptionStatus: 'trial', trialEndsAt },
         });
         const subscription = await tx.subscription.create({ data: { organizationId: organization.id, plan: 'FREE_TRIAL', status: 'TRIALING', trialStartedAt: new Date(), trialEndsAt } });
         const permissions = await tx.permission.findMany({ where: { code: { in: permissionDefinitions.map(([code]) => code) } } });

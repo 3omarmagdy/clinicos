@@ -22,7 +22,7 @@ export class AppointmentService {
     const end = query.to ? new Date(query.to) : new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
     return this.prisma.appointment.findMany({
       where: { organizationId, scheduledAt: { gte: start, lt: end }, ...(query.doctorId ? { doctorId: query.doctorId } : {}) },
-      include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, visit: true },
+      include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, service: true, visit: true },
       orderBy: { scheduledAt: 'asc' },
     });
   }
@@ -55,12 +55,14 @@ export class AppointmentService {
     const patient = await this.prisma.patient.findFirst({ where: { id: data.patientId, organizationId }, select: { id: true } });
     if (!patient) throw new NotFoundException('Patient not found');
     await this.assertDoctor(organizationId, data.doctorId);
+    const service = data.serviceId ? await this.prisma.service.findFirst({ where: { id: data.serviceId, organizationId, isActive: true } }) : null;
+    if (data.serviceId && !service) throw new BadRequestException('Selected service is not active in this clinic');
     const scheduledAt = new Date(data.scheduledAt);
-    const durationMinutes = data.durationMinutes ?? 30;
+    const durationMinutes = data.durationMinutes ?? service?.durationMinutes ?? 30;
     await this.assertNoConflict(organizationId, data.doctorId, scheduledAt, durationMinutes);
     const appointment = await this.prisma.appointment.create({
-      data: { organizationId, createdById, patientId: data.patientId, doctorId: data.doctorId, scheduledAt, durationMinutes, reason: data.reason?.trim(), notes: data.notes?.trim() },
-      include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, visit: true },
+      data: { organizationId, createdById, patientId: data.patientId, serviceId: service?.id, doctorId: data.doctorId, scheduledAt, durationMinutes, reason: data.reason?.trim() || service?.name, notes: data.notes?.trim() },
+      include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, service: true, visit: true },
     });
     await this.audit.log({ organizationId, actorId: createdById, action: 'appointment.created', entityType: 'appointment', entityId: appointment.id, summary: 'Created appointment', metadata: { doctorAssigned: Boolean(data.doctorId) } });
     return appointment;
