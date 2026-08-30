@@ -99,7 +99,7 @@ export default function WhatsAppSettingsPage() {
     try {
       const response = await authenticatedFetch('/api/v1/whatsapp/integration', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       if (!response.ok) throw new Error(await getApiErrorMessage(response, 'تعذر حفظ إعدادات WhatsApp.'));
-      setForm((value) => ({ ...value, accessToken: '' })); setNotice('تم حفظ إعدادات العيادة مشفّرة.'); await refresh();
+      setForm((value) => ({ ...value, accessToken: '' })); setNotice('تم حفظ إعدادات العيادة مشفّرة. اختبار الإرسال هو التحقق الفعلي من صلاحيات Meta، ولا تُرسل أي رسالة تلقائيًا.'); await refresh();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'تعذر حفظ الإعدادات.'); } finally { setSaving(false); }
   }
 

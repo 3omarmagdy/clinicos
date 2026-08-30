@@ -27,9 +27,7 @@ type IntegrationInput = {
 
 type EncryptedValue = { ciphertext: string; iv: string; authTag: string };
 type MetaGraphResponse = { ok: boolean; json(): Promise<unknown> };
-type MetaGraphError = { code?: number };
-type MetaTokenResponse = { access_token?: string; error?: MetaGraphError };
-type MetaPhoneNumberResponse = { id?: string; whatsapp_business_account?: { id?: string }; error?: MetaGraphError };
+type MetaTokenResponse = { access_token?: string; error?: { code?: number } };
 type IntegrationRecord = {
   organizationId: string;
   phoneNumberId: string;
@@ -50,8 +48,12 @@ export class WhatsAppIntegrationService {
 
   async upsert(organizationId: string, input: IntegrationInput): Promise<void> {
     if (!this.encryptionKey()) throw new BadRequestException('WhatsApp encryption key is not configured');
-    await this.validateWithMeta(input);
-    const encrypted = this.encrypt(input.accessToken);
+    const accessToken = input.accessToken.trim();
+    if (!accessToken) throw new BadRequestException('Access Token مطلوب لحفظ إعدادات WhatsApp.');
+    // A temporary Cloud API token can send messages but may not be allowed to
+    // read phone-number metadata. Do not block a disabled configuration on a
+    // management-only read; the actual send path remains the final check.
+    const encrypted = this.encrypt(accessToken);
     const data = {
       phoneNumberId: input.phoneNumberId.trim(),
       wabaId: input.wabaId.trim(),
@@ -98,38 +100,6 @@ export class WhatsAppIntegrationService {
   async getByPhoneNumberId(phoneNumberId: string): Promise<WhatsAppIntegrationConfig | null> {
     const record = await this.prisma.whatsAppIntegration.findUnique({ where: { phoneNumberId } }) as IntegrationRecord | null;
     return record ? this.decryptRecord(record) : null;
-  }
-
-  private async validateWithMeta(input: IntegrationInput): Promise<void> {
-    const apiVersion = input.apiVersion?.trim() || 'v26.0';
-    try {
-      const response = await fetch(`https://graph.facebook.com/${apiVersion}/${encodeURIComponent(input.phoneNumberId.trim())}?fields=id,whatsapp_business_account`, { headers: { Authorization: `Bearer ${input.accessToken}` } }) as unknown as MetaGraphResponse;
-      const body = await response.json() as MetaPhoneNumberResponse;
-      if (!response.ok) throw new BadRequestException(this.metaValidationMessage(body.error));
-      if (body.id !== input.phoneNumberId.trim() || body.whatsapp_business_account?.id !== input.wabaId.trim()) {
-        throw new BadRequestException('Phone Number ID وWABA ID لا ينتميان إلى نفس حساب WhatsApp Business. انسخهما من نفس صفحة Meta ثم أعد المحاولة.');
-      }
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      throw new BadRequestException('تعذر التحقق من Phone Number ID وWABA ID وAccess Token عبر Meta. راجع بيانات الربط وصلاحيات Access Token.');
-    }
-  }
-
-  private metaValidationMessage(error?: MetaGraphError): string {
-    switch (error?.code) {
-      case 190:
-        return 'Access Token غير صالح أو انتهت صلاحيته. أنشئ Token جديدًا من Meta واحفظه فورًا.';
-      case 100:
-        return 'Phone Number ID غير صحيح أو لا يمكن للـAccess Token الوصول إليه. تأكد من الرقم والصلاحيات.';
-      case 10:
-      case 200:
-        return 'Access Token لا يملك صلاحية الوصول إلى WhatsApp Business. أنشئ Token بالصلاحيات الصحيحة ثم أعد المحاولة.';
-      case 4:
-      case 17:
-        return 'Meta أوقفت المحاولات مؤقتًا بسبب كثرتها. انتظر قليلًا ثم أعد المحاولة.';
-      default:
-        return `رفضت Meta التحقق من بيانات الربط${error?.code ? ` (رمز ${error.code})` : ''}. راجع الـIDs والـAccess Token.`;
-    }
   }
 
   private async exchangeEmbeddedSignupCode(code: string, requestedVersion?: string): Promise<string> {
