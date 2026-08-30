@@ -47,6 +47,15 @@ CRON_SECRET="GENERATE_A_UNIQUE_RANDOM_SECRET"
 WHATSAPP_REMINDER_LEAD_HOURS=24
 WHATSAPP_REMINDER_WINDOW_MINUTES=720
 WHATSAPP_MONTHLY_MESSAGE_LIMIT=0
+
+# Self-service WhatsApp Business onboarding (Meta Embedded Signup).
+# The app ID and configuration ID are public identifiers; the app secret must
+# exist only in the API's Vercel project. Keep this false until the Meta
+# configuration and allowed domains have been set up.
+META_WHATSAPP_EMBEDDED_SIGNUP_ENABLED="false"
+META_APP_ID="YOUR_META_APP_ID"
+META_APP_SECRET="YOUR_META_APP_SECRET"
+META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID="YOUR_META_EMBEDDED_SIGNUP_CONFIG_ID"
 ```
 
 For the hosted frontend, set `NEXT_PUBLIC_DEMO_MODE=false` and

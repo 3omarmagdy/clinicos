@@ -4,7 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import type { AuthContext } from '@clinicos/shared-types';
-import { CreateMarketingCampaignDto, SendMarketingCampaignDto, UpsertWhatsAppIntegrationDto } from './marketing.dto';
+import { CompleteEmbeddedWhatsAppSignupDto, CreateMarketingCampaignDto, SendMarketingCampaignDto, UpsertWhatsAppIntegrationDto } from './marketing.dto';
 import { WhatsAppMarketingService } from './whatsapp-marketing.service';
 import { WhatsAppService } from './whatsapp.service';
 import { WhatsAppIntegrationService } from './whatsapp-integration.service';
@@ -58,6 +58,21 @@ export class WhatsAppController {
   @RequirePermissions('organization:update')
   async upsertIntegration(@Body() data: UpsertWhatsAppIntegrationDto, @Req() req: { user: AuthContext }) {
     await this.integrations.upsert(req.user.organizationId, data);
+    return { saved: true };
+  }
+
+  @Get('embedded-signup/config')
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:update')
+  embeddedSignupConfig() {
+    return this.integrations.embeddedSignupConfig();
+  }
+
+  @Post('embedded-signup/complete')
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:update')
+  async completeEmbeddedSignup(@Body() data: CompleteEmbeddedWhatsAppSignupDto, @Req() req: { user: AuthContext }) {
+    await this.integrations.completeEmbeddedSignup(req.user.organizationId, data);
     return { saved: true };
   }
 
