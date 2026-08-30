@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "nest start --watch",
-    "prebuild": "pnpm --filter @clinicos/shared-types build && pnpm --filter @clinicos/database exec prisma generate --schema prisma/schema.prisma",
+    "prebuild": "pnpm --filter @clinicos/shared-types build && pnpm --filter @clinicos/database exec prisma generate --schema prisma/schema.prisma && pnpm --filter @clinicos/database prisma:migrate",
     "build": "nest build",
     "start": "node dist/main",
     "debug": "nest start --debug 9229",
