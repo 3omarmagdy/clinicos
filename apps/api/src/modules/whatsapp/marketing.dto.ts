@@ -32,3 +32,16 @@ export class UpsertWhatsAppIntegrationDto {
   @IsOptional() @IsString() @Matches(/^[a-z]{2}([_-][A-Z]{2})?$/) templateLanguage?: string;
   @IsOptional() @IsBoolean() enabled?: boolean;
 }
+
+/** Meta returns this one-time code after Embedded Signup. It is exchanged on
+ * the server, so no Meta app secret or clinic access token reaches the browser. */
+export class CompleteEmbeddedWhatsAppSignupDto {
+  @IsString() @MinLength(8) @MaxLength(8192) code!: string;
+  @IsString() @Matches(/^[A-Za-z0-9_-]{6,80}$/) phoneNumberId!: string;
+  @IsString() @Matches(/^[A-Za-z0-9_-]{6,100}$/) wabaId!: string;
+  @IsOptional() @IsString() @Matches(/^v\d+\.\d+$/) apiVersion?: string;
+  @IsString() @Matches(/^[A-Za-z0-9_]{1,100}$/) appointmentTemplate!: string;
+  @IsOptional() @IsString() @Matches(/^[A-Za-z0-9_]{1,100}$/) marketingTemplate?: string;
+  @IsOptional() @IsString() @Matches(/^[a-z]{2}([_-][A-Z]{2})?$/) templateLanguage?: string;
+  @IsOptional() @IsBoolean() enabled?: boolean;
+}
