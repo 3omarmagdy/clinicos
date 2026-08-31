@@ -1,5 +1,5 @@
 ﻿import { randomUUID } from 'node:crypto';
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import type { Patient } from '@clinicos/shared-types';
@@ -166,6 +166,30 @@ export class PatientService {
     const result = records.length ? await this.prisma.patient.createMany({ data: records as never[] }) : { count: 0 };
     await this.audit.log({ organizationId, actorId, action: 'patient.imported', entityType: 'patient_import', summary: `Imported ${result.count} patient records; skipped ${skippedRows.length}`, metadata: { created: result.count, skipped: skippedRows.length } });
     return { created: result.count, skipped: skippedRows.length, skippedRows };
+  }
+
+  async bulkDelete(organizationId: string, patientIds: string[], confirmationCount: number, actorId?: string) {
+    await this.subscriptions.assertCanWrite(organizationId);
+
+    if (patientIds.length !== confirmationCount) {
+      throw new BadRequestException('Confirmation count does not match the selected patients.');
+    }
+
+    const matched = await this.prisma.patient.count({ where: { organizationId, id: { in: patientIds } } });
+    if (matched !== patientIds.length) {
+      throw new NotFoundException('One or more selected patients no longer exist in this clinic. Refresh the list and try again.');
+    }
+
+    const result = await this.prisma.patient.deleteMany({ where: { organizationId, id: { in: patientIds } } });
+    await this.audit.log({
+      organizationId,
+      actorId,
+      action: 'patient.bulk_deleted',
+      entityType: 'patient',
+      summary: `Permanently deleted ${result.count} patient records`,
+      metadata: { count: result.count, patientIdSample: patientIds.slice(0, 10) },
+    });
+    return { deleted: result.count };
   }
 
   private audienceWhere(organizationId: string, filters: MarketingAudienceQueryDto): Prisma.PatientWhereInput {
