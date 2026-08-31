@@ -5,7 +5,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { authenticatedFetch, getAccessToken, hasSessionPermission } from '@/lib/auth-session';
 import { getApiErrorMessage } from '@/lib/api-error';
 
-type Summary = { configured: boolean; phoneNumberId?: string; enabled?: boolean };
+type Summary = { configured: boolean; phoneNumberId?: string; wabaId?: string; appointmentTemplate?: string; marketingTemplate?: string | null; templateLanguage?: string; apiVersion?: string; enabled?: boolean };
 type EmbeddedConfig = { configured: boolean; appId?: string; configurationId?: string; apiVersion: string };
 type FormState = { phoneNumberId: string; wabaId: string; accessToken: string; apiVersion: string; appointmentTemplate: string; marketingTemplate: string; templateLanguage: string; enabled: boolean };
 type SignupDetails = { phoneNumberId: string; wabaId: string };
@@ -33,7 +33,11 @@ export default function WhatsAppSettingsPage() {
 
   const refresh = useCallback(async () => {
     const response = await authenticatedFetch('/api/v1/whatsapp/integration');
-    if (response.ok) setSummary(await response.json() as Summary);
+    if (response.ok) {
+      const nextSummary = await response.json() as Summary;
+      setSummary(nextSummary);
+      if (nextSummary.configured) setForm((current) => ({ ...current, phoneNumberId: nextSummary.phoneNumberId || current.phoneNumberId, wabaId: nextSummary.wabaId || current.wabaId, appointmentTemplate: nextSummary.appointmentTemplate || current.appointmentTemplate, marketingTemplate: nextSummary.marketingTemplate || current.marketingTemplate, templateLanguage: nextSummary.templateLanguage || current.templateLanguage, apiVersion: nextSummary.apiVersion || current.apiVersion, enabled: nextSummary.enabled === true }));
+    }
   }, []);
 
   useEffect(() => {
