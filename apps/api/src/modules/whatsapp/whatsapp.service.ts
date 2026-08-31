@@ -223,11 +223,13 @@ export class WhatsAppService {
         headers: { Authorization: `Bearer ${config.accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }) as unknown as WhatsAppApiResponse;
-      const responseBody = await response.json() as { messages?: Array<{ id?: string }>; error?: { message?: string } };
+      const responseBody = await response.json() as { messages?: Array<{ id?: string }>; error?: { code?: number; message?: string; error_data?: { details?: string } } };
       if (!response.ok) {
-        this.logger.error(`WhatsApp delivery failed for appointment ${appointment.id}: ${response.status} ${responseBody.error?.message || 'unknown error'}`);
-        await this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'FAILED', failureReason: 'provider_rejected_message', failedAt: new Date() } });
-        return { appointmentId: appointment.id, status: 'failed', reason: 'provider_rejected_message' };
+        const providerCode = responseBody.error?.code;
+        const safeReason = providerCode ? `provider_rejected_message_${providerCode}` : 'provider_rejected_message';
+        this.logger.error(`WhatsApp delivery failed for appointment ${appointment.id}: ${response.status} code=${providerCode || 'unknown'} ${responseBody.error?.message || 'unknown error'}`);
+        await this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'FAILED', failureReason: safeReason, failedAt: new Date() } });
+        return { appointmentId: appointment.id, status: 'failed', reason: safeReason };
       }
       const messageId = responseBody.messages?.[0]?.id;
       if (!messageId) {
