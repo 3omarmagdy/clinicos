@@ -27,6 +27,7 @@ type IntegrationInput = {
 
 type EncryptedValue = { ciphertext: string; iv: string; authTag: string };
 type MetaGraphResponse = { ok: boolean; json(): Promise<unknown> };
+type MetaTokenResponse = { access_token?: string; error?: { code?: number } };
 type IntegrationRecord = {
   organizationId: string;
   phoneNumberId: string;
@@ -47,8 +48,12 @@ export class WhatsAppIntegrationService {
 
   async upsert(organizationId: string, input: IntegrationInput): Promise<void> {
     if (!this.encryptionKey()) throw new BadRequestException('WhatsApp encryption key is not configured');
-    await this.validateWithMeta(input);
-    const encrypted = this.encrypt(input.accessToken);
+    const accessToken = input.accessToken.trim();
+    if (!accessToken) throw new BadRequestException('Access Token مطلوب لحفظ إعدادات WhatsApp.');
+    // A temporary Cloud API token can send messages but may not be allowed to
+    // read phone-number metadata. Do not block a disabled configuration on a
+    // management-only read; the actual send path remains the final check.
+    const encrypted = this.encrypt(accessToken);
     const data = {
       phoneNumberId: input.phoneNumberId.trim(),
       wabaId: input.wabaId.trim(),
@@ -62,6 +67,24 @@ export class WhatsAppIntegrationService {
       enabled: input.enabled === true,
     };
     await this.prisma.whatsAppIntegration.upsert({ where: { organizationId }, create: { organizationId, ...data }, update: data });
+  }
+
+  /** Sends only public Meta configuration to the clinic browser. */
+  embeddedSignupConfig() {
+    const appId = process.env.META_APP_ID;
+    const configurationId = process.env.META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID;
+    const enabled = process.env.META_WHATSAPP_EMBEDDED_SIGNUP_ENABLED === 'true';
+    return {
+      configured: Boolean(enabled && appId && configurationId && process.env.META_APP_SECRET),
+      appId: enabled && appId ? appId : undefined,
+      configurationId: enabled && configurationId ? configurationId : undefined,
+      apiVersion: process.env.WHATSAPP_API_VERSION || 'v26.0',
+    };
+  }
+
+  async completeEmbeddedSignup(organizationId: string, input: Omit<IntegrationInput, 'accessToken'> & { code: string }): Promise<void> {
+    const accessToken = await this.exchangeEmbeddedSignupCode(input.code, input.apiVersion);
+    await this.upsert(organizationId, { ...input, accessToken });
   }
 
   async summary(organizationId: string) {
@@ -79,14 +102,21 @@ export class WhatsAppIntegrationService {
     return record ? this.decryptRecord(record) : null;
   }
 
-  private async validateWithMeta(input: IntegrationInput): Promise<void> {
-    const apiVersion = input.apiVersion?.trim() || 'v26.0';
+  private async exchangeEmbeddedSignupCode(code: string, requestedVersion?: string): Promise<string> {
+    const appId = process.env.META_APP_ID;
+    const appSecret = process.env.META_APP_SECRET;
+    if (process.env.META_WHATSAPP_EMBEDDED_SIGNUP_ENABLED !== 'true' || !appId || !appSecret) {
+      throw new BadRequestException('ربط Meta التلقائي غير مهيأ بعد. استخدم الربط اليدوي أو اطلب من مدير المنصة إكمال إعداد Meta.');
+    }
+    const apiVersion = requestedVersion?.trim() || process.env.WHATSAPP_API_VERSION || 'v26.0';
+    const params = new URLSearchParams({ client_id: appId, client_secret: appSecret, code: code.trim() });
     try {
-      const response = await fetch(`https://graph.facebook.com/${apiVersion}/${encodeURIComponent(input.phoneNumberId.trim())}?fields=id,whatsapp_business_account`, { headers: { Authorization: `Bearer ${input.accessToken}` } }) as unknown as MetaGraphResponse;
-      const body = await response.json() as { id?: string; whatsapp_business_account?: { id?: string }; error?: { code?: number } };
-      if (!response.ok || body.id !== input.phoneNumberId.trim() || body.whatsapp_business_account?.id !== input.wabaId.trim()) throw new Error(`Meta validation failed${body.error?.code ? ` (${body.error.code})` : ''}`);
+      const response = await fetch(`https://graph.facebook.com/${apiVersion}/oauth/access_token?${params.toString()}`) as unknown as MetaGraphResponse;
+      const body = await response.json() as MetaTokenResponse;
+      if (!response.ok || !body.access_token) throw new Error(`Meta token exchange failed${body.error?.code ? ` (${body.error.code})` : ''}`);
+      return body.access_token;
     } catch {
-      throw new BadRequestException('تعذر التحقق من Phone Number ID وWABA ID وAccess Token عبر Meta. راجع بيانات الربط وصلاحيات Access Token.');
+      throw new BadRequestException('تعذر إتمام ربط Meta. أعد فتح خطوة الربط وجرّب مرة أخرى.');
     }
   }
 
