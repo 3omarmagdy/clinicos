@@ -44,9 +44,12 @@ type IntegrationRecord = {
 
 @Injectable()
 export class WhatsAppIntegrationService {
+  private legacySchemaRepair: Promise<void> | null = null;
+
   constructor(private readonly prisma: PrismaService) {}
 
   async upsert(organizationId: string, input: IntegrationInput): Promise<void> {
+    await this.ensureLegacyIntegrationSchema();
     const accessToken = input.accessToken.trim();
     if (!accessToken) throw new BadRequestException('Access Token مطلوب لحفظ إعدادات WhatsApp.');
     // A temporary Cloud API token can send messages but may not be allowed to
@@ -87,16 +90,19 @@ export class WhatsAppIntegrationService {
   }
 
   async summary(organizationId: string) {
+    await this.ensureLegacyIntegrationSchema();
     const record = await this.prisma.whatsAppIntegration.findUnique({ where: { organizationId }, select: { phoneNumberId: true, wabaId: true, appointmentTemplate: true, marketingTemplate: true, templateLanguage: true, apiVersion: true, enabled: true, updatedAt: true } });
     return record ? { configured: true, ...record } : { configured: false };
   }
 
   async getForOrganization(organizationId: string): Promise<WhatsAppIntegrationConfig | null> {
+    await this.ensureLegacyIntegrationSchema();
     const record = await this.prisma.whatsAppIntegration.findUnique({ where: { organizationId } }) as IntegrationRecord | null;
     return record ? this.decryptRecord(record) : null;
   }
 
   async getByPhoneNumberId(phoneNumberId: string): Promise<WhatsAppIntegrationConfig | null> {
+    await this.ensureLegacyIntegrationSchema();
     const record = await this.prisma.whatsAppIntegration.findUnique({ where: { phoneNumberId } }) as IntegrationRecord | null;
     return record ? this.decryptRecord(record) : null;
   }
@@ -121,6 +127,38 @@ export class WhatsAppIntegrationService {
 
   private decryptRecord(record: IntegrationRecord): WhatsAppIntegrationConfig {
     return { organizationId: record.organizationId, phoneNumberId: record.phoneNumberId, wabaId: record.wabaId, accessToken: this.decrypt(record.accessTokenCiphertext, record.accessTokenIv, record.accessTokenAuthTag), apiVersion: record.apiVersion, appointmentTemplate: record.appointmentTemplate, marketingTemplate: record.marketingTemplate, templateLanguage: record.templateLanguage, enabled: record.enabled };
+  }
+
+  /**
+   * Early production databases received an incomplete version of this table.
+   * The formal migration remains authoritative; this idempotent fallback makes
+   * the settings page recover safely when an older table is already present.
+   */
+  private ensureLegacyIntegrationSchema(): Promise<void> {
+    if (this.legacySchemaRepair) return this.legacySchemaRepair;
+
+    const execute = (this.prisma as PrismaService & { $executeRawUnsafe?: (sql: string) => Promise<unknown> }).$executeRawUnsafe;
+    if (!execute) return Promise.resolve();
+
+    this.legacySchemaRepair = execute.call(this.prisma, `
+      ALTER TABLE IF EXISTS "whatsapp_integrations"
+        ADD COLUMN IF NOT EXISTS "wabaId" TEXT,
+        ADD COLUMN IF NOT EXISTS "accessTokenCiphertext" TEXT,
+        ADD COLUMN IF NOT EXISTS "accessTokenIv" TEXT,
+        ADD COLUMN IF NOT EXISTS "accessTokenAuthTag" TEXT,
+        ADD COLUMN IF NOT EXISTS "apiVersion" TEXT DEFAULT 'v26.0',
+        ADD COLUMN IF NOT EXISTS "appointmentTemplate" TEXT,
+        ADD COLUMN IF NOT EXISTS "marketingTemplate" TEXT,
+        ADD COLUMN IF NOT EXISTS "templateLanguage" TEXT DEFAULT 'ar',
+        ADD COLUMN IF NOT EXISTS "enabled" BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3);
+    `).then(() => undefined).catch(() => {
+      this.legacySchemaRepair = null;
+      throw new ServiceUnavailableException('تعذر تجهيز قاعدة بيانات WhatsApp. راجع اتصال قاعدة البيانات ثم أعد المحاولة.');
+    });
+
+    return this.legacySchemaRepair;
   }
 
   private encryptionKey(): Buffer {
