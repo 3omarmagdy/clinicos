@@ -42,6 +42,18 @@ describe('WhatsAppIntegrationService', () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
+  it('rejects an encryption key shorter than 32 characters before writing', async () => {
+    process.env.WHATSAPP_ENCRYPTION_KEY = 'too-short';
+    const upsert = jest.fn().mockResolvedValue({});
+    const prisma = { whatsAppIntegration: { upsert, findUnique: jest.fn() } };
+    const service = new WhatsAppIntegrationService(prisma as never);
+
+    await expect(service.upsert('org-1', {
+      phoneNumberId: '123456789', wabaId: 'waba-123456', accessToken: 'access-token-secret', appointmentTemplate: 'clinic_appointment_reminder', enabled: false,
+    })).rejects.toThrow('32');
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
   it('accepts a restricted temporary token for a disabled configuration without making a management read', async () => {
     process.env.WHATSAPP_ENCRYPTION_KEY = 'test-encryption-key-with-enough-entropy';
     global.fetch = jest.fn();
