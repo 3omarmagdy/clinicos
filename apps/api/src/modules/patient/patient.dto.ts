@@ -15,7 +15,30 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+
+const maritalStatusAliases: Record<string, 'single' | 'married' | 'divorced' | 'widowed' | 'other'> = {
+  single: 'single',
+  married: 'married',
+  divorced: 'divorced',
+  widowed: 'widowed',
+  other: 'other',
+  'أعزب': 'single',
+  'عزباء': 'single',
+  'متزوج': 'married',
+  'متزوجة': 'married',
+  'مطلق': 'divorced',
+  'مطلقة': 'divorced',
+  'أرمل': 'widowed',
+  'أرملة': 'widowed',
+  'اخرى': 'other',
+  'أخرى': 'other',
+};
+
+function normalizeMaritalStatus(value: unknown) {
+  if (typeof value !== 'string') return undefined;
+  return maritalStatusAliases[value.trim().toLowerCase()];
+}
 
 export class CreatePatientDto {
   @IsString() @MinLength(1) @MaxLength(80) firstName!: string;
@@ -34,6 +57,7 @@ export class CreatePatientDto {
   @IsOptional() @IsInt() @Min(0) @Max(130) age?: number;
 
   @IsOptional() @IsString() @MaxLength(40) gender?: string;
+  @Transform(({ value }) => normalizeMaritalStatus(value), { toClassOnly: true })
   @IsOptional() @IsIn(['single', 'married', 'divorced', 'widowed', 'other']) maritalStatus?: string;
   @IsOptional() @IsString() @MaxLength(30) phone?: string;
   @IsOptional() @IsString() @MaxLength(30) whatsappPhone?: string;
@@ -71,6 +95,7 @@ export class UpdatePatientDto {
   @IsOptional() @IsDateString() dateOfBirth?: string;
   @IsOptional() @IsDateString() admittedAt?: string;
   @IsOptional() @IsString() @MaxLength(40) gender?: string;
+  @Transform(({ value }) => normalizeMaritalStatus(value), { toClassOnly: true })
   @IsOptional() @IsIn(['single', 'married', 'divorced', 'widowed', 'other']) maritalStatus?: string;
   @IsOptional() @IsString() @MaxLength(30) phone?: string;
   @IsOptional() @IsString() @MaxLength(30) whatsappPhone?: string;
