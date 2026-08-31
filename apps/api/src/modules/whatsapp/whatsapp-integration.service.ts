@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -47,7 +47,6 @@ export class WhatsAppIntegrationService {
   constructor(private readonly prisma: PrismaService) {}
 
   async upsert(organizationId: string, input: IntegrationInput): Promise<void> {
-    if (!this.encryptionKey()) throw new BadRequestException('WhatsApp encryption key is not configured');
     const accessToken = input.accessToken.trim();
     if (!accessToken) throw new BadRequestException('Access Token مطلوب لحفظ إعدادات WhatsApp.');
     // A temporary Cloud API token can send messages but may not be allowed to
@@ -125,8 +124,13 @@ export class WhatsAppIntegrationService {
   }
 
   private encryptionKey(): Buffer {
-    const source = process.env.WHATSAPP_ENCRYPTION_KEY || (process.env.NODE_ENV === 'test' ? process.env.JWT_SECRET : undefined);
-    if (!source) throw new Error('WHATSAPP_ENCRYPTION_KEY is not configured');
+    // This key must be configured once and kept stable in the API production environment.
+    // Never fall back to JWT_SECRET in production: rotating JWT credentials would make
+    // existing WhatsApp tokens undecryptable and could cause an opaque 500 response.
+    const source = process.env.WHATSAPP_ENCRYPTION_KEY?.trim();
+    if (!source || source.length < 32) {
+      throw new ServiceUnavailableException('إعدادات WhatsApp غير مكتملة على الخادم: يجب ضبط WHATSAPP_ENCRYPTION_KEY بطول لا يقل عن 32 حرفًا.');
+    }
     return createHash('sha256').update(source).digest();
   }
 
