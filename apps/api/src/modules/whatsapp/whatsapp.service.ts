@@ -117,6 +117,20 @@ export class WhatsAppService {
   private isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
   private asArray(value: unknown): unknown[] { return Array.isArray(value) ? value : []; }
 
+  async sendTestReminder(appointmentId: string, organizationId: string): Promise<ReminderResult> {
+    const appointment = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, organizationId },
+      include: {
+        patient: true,
+        doctor: { select: { firstName: true, lastName: true } },
+        organization: { select: { name: true, timezone: true, subscriptionPlan: true } },
+      },
+    });
+    if (!appointment) return { appointmentId, status: 'failed', reason: 'appointment_not_found' };
+    if (appointment.whatsappReminderSentAt) return { appointmentId, status: 'skipped', reason: 'reminder_already_sent' };
+    return this.sendForAppointment(appointment);
+  }
+
   async runDueReminders(): Promise<{ windowStart: string; windowEnd: string; results: ReminderResult[] }> {
     const now = new Date();
     const leadMs = this.reminderLeadHours() * 60 * 60 * 1000;

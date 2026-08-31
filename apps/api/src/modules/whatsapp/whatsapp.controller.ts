@@ -34,6 +34,13 @@ export class WhatsAppController {
     return this.whatsapp.handleWebhook(body, rawBody, signature);
   }
 
+  @Post('appointments/:id/test-reminder')
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('appointment:update')
+  async testAppointmentReminder(@Param('id') id: string, @Req() req: { user: AuthContext }) {
+    return this.whatsapp.sendTestReminder(id, req.user.organizationId);
+  }
+
   @Post('reminders/run')
   runReminders(@Headers('authorization') authorization?: string) {
     const expected = process.env.CRON_SECRET || process.env.WHATSAPP_CRON_SECRET;
