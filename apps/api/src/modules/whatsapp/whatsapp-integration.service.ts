@@ -140,25 +140,28 @@ export class WhatsAppIntegrationService {
     const execute = (this.prisma as PrismaService & { $executeRawUnsafe?: (sql: string) => Promise<unknown> }).$executeRawUnsafe;
     if (!execute) return Promise.resolve();
 
+    // Prisma prepared statements accept one PostgreSQL command.  Keep every
+    // additive repair inside one DO block instead of sending a SQL batch.
     this.legacySchemaRepair = execute.call(this.prisma, `
-      ALTER TABLE IF EXISTS "whatsapp_integrations"
-        ADD COLUMN IF NOT EXISTS "wabaId" TEXT,
-        ADD COLUMN IF NOT EXISTS "accessTokenCiphertext" TEXT,
-        ADD COLUMN IF NOT EXISTS "accessTokenIv" TEXT,
-        ADD COLUMN IF NOT EXISTS "accessTokenAuthTag" TEXT,
-        ADD COLUMN IF NOT EXISTS "apiVersion" TEXT DEFAULT 'v26.0',
-        ADD COLUMN IF NOT EXISTS "appointmentTemplate" TEXT,
-        ADD COLUMN IF NOT EXISTS "marketingTemplate" TEXT,
-        ADD COLUMN IF NOT EXISTS "templateLanguage" TEXT DEFAULT 'ar',
-        ADD COLUMN IF NOT EXISTS "enabled" BOOLEAN DEFAULT false,
-        ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3);
-
-      -- The earliest tenant-specific schema stored per-clinic app secrets and
-      -- verify tokens. They are now centralized in Vercel and must stay out
-      -- of this table, so legacy NOT NULL constraints must not block a save.
       DO $$
       BEGIN
+        IF to_regclass('whatsapp_integrations') IS NULL THEN
+          RETURN;
+        END IF;
+
+        ALTER TABLE "whatsapp_integrations"
+          ADD COLUMN IF NOT EXISTS "wabaId" TEXT,
+          ADD COLUMN IF NOT EXISTS "accessTokenCiphertext" TEXT,
+          ADD COLUMN IF NOT EXISTS "accessTokenIv" TEXT,
+          ADD COLUMN IF NOT EXISTS "accessTokenAuthTag" TEXT,
+          ADD COLUMN IF NOT EXISTS "apiVersion" TEXT DEFAULT 'v26.0',
+          ADD COLUMN IF NOT EXISTS "appointmentTemplate" TEXT,
+          ADD COLUMN IF NOT EXISTS "marketingTemplate" TEXT,
+          ADD COLUMN IF NOT EXISTS "templateLanguage" TEXT DEFAULT 'ar',
+          ADD COLUMN IF NOT EXISTS "enabled" BOOLEAN DEFAULT false,
+          ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3);
+
         IF EXISTS (
           SELECT 1 FROM information_schema.columns
           WHERE table_schema = current_schema()
