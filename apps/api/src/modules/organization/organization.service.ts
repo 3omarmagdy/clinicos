@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Organization, CreateOrganizationDTO } from '@clinicos/shared-types';
-import type { UpdateOrganizationDto } from './organization.dto';
+import type { CreateServiceDto, UpdateOrganizationDto, UpdateServiceDto } from './organization.dto';
 import { AuditService } from '../audit/audit.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 
@@ -43,6 +43,38 @@ export class OrganizationService {
     const defaults = this.defaultServices[organization.specialty] || this.defaultServices.GENERAL;
     await this.prisma.service.createMany({ data: defaults.map((service) => ({ ...service, organizationId, specialty: organization.specialty })) });
     return this.prisma.service.findMany({ where: { organizationId, isActive: true }, orderBy: { name: 'asc' } });
+  }
+
+  async createService(organizationId: string, actorId: string, data: CreateServiceDto) {
+    await this.subscriptions.assertCanWrite(organizationId);
+    const organization = await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { specialty: true } });
+    if (!organization) throw new NotFoundException('Clinic not found');
+    try {
+      const service = await this.prisma.service.create({ data: { organizationId, name: data.name.trim(), specialty: organization.specialty, durationMinutes: data.durationMinutes, price: data.price } });
+      await this.audit.log({ organizationId, actorId, action: 'service.created', entityType: 'service', entityId: service.id, summary: 'Created clinic service' });
+      return service;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Unique constraint')) throw new BadRequestException('A service with this name already exists');
+      throw error;
+    }
+  }
+
+  async updateService(id: string, organizationId: string, actorId: string, data: UpdateServiceDto) {
+    await this.subscriptions.assertCanWrite(organizationId);
+    const existing = await this.prisma.service.findFirst({ where: { id, organizationId } });
+    if (!existing) throw new NotFoundException('Service not found');
+    const service = await this.prisma.service.update({ where: { id }, data: { ...(data.name !== undefined ? { name: data.name.trim() } : {}), ...(data.durationMinutes !== undefined ? { durationMinutes: data.durationMinutes } : {}), ...(data.price !== undefined ? { price: data.price } : {}), ...(data.isActive !== undefined ? { isActive: data.isActive } : {}) } });
+    await this.audit.log({ organizationId, actorId, action: 'service.updated', entityType: 'service', entityId: service.id, summary: 'Updated clinic service' });
+    return service;
+  }
+
+  async deleteService(id: string, organizationId: string, actorId: string) {
+    await this.subscriptions.assertCanWrite(organizationId);
+    const existing = await this.prisma.service.findFirst({ where: { id, organizationId } });
+    if (!existing) throw new NotFoundException('Service not found');
+    const service = await this.prisma.service.update({ where: { id }, data: { isActive: false } });
+    await this.audit.log({ organizationId, actorId, action: 'service.deactivated', entityType: 'service', entityId: service.id, summary: 'Deactivated clinic service' });
+    return service;
   }
 
   async createOrganization(data: CreateOrganizationDTO): Promise<Organization> {

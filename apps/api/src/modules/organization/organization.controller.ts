@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { OrganizationService } from './organization.service';
 import type { AuthContext, Organization } from '@clinicos/shared-types';
-import { UpdateOrganizationDto } from './organization.dto';
+import { CreateServiceDto, UpdateOrganizationDto, UpdateServiceDto } from './organization.dto';
 
 @Controller('organizations')
 export class OrganizationController {
@@ -15,6 +15,27 @@ export class OrganizationController {
   @Get('me/services')
   async services(@Req() req: { user: AuthContext }) {
     return this.organizationService.listServices(req.user.organizationId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:update')
+  @Post('me/services')
+  async createService(@Body() data: CreateServiceDto, @Req() req: { user: AuthContext }) {
+    return this.organizationService.createService(req.user.organizationId, req.user.userId, data);
+  }
+
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:update')
+  @Put('me/services/:serviceId')
+  async updateService(@Param('serviceId') serviceId: string, @Body() data: UpdateServiceDto, @Req() req: { user: AuthContext }) {
+    return this.organizationService.updateService(serviceId, req.user.organizationId, req.user.userId, data);
+  }
+
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:update')
+  @Delete('me/services/:serviceId')
+  async deleteService(@Param('serviceId') serviceId: string, @Req() req: { user: AuthContext }) {
+    return this.organizationService.deleteService(serviceId, req.user.organizationId, req.user.userId);
   }
 
   @UseGuards(AuthGuard('jwt'), PermissionsGuard)
