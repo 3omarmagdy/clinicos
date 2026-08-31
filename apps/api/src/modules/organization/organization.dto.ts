@@ -29,7 +29,7 @@ export class UpdateOrganizationDto {
   @IsString() @IsIn(['CLINIC', 'HOSPITAL', 'CENTER', 'RADIOLOGY_CENTER'])
   facilityType!: string;
 
-  @IsString() @IsIn(['GENERAL', 'DENTAL', 'SURGERY', 'RADIOLOGY', 'OBGYN', 'OPHTHALMOLOGY', 'UROLOGY', 'BEAUTY'])
+  @IsString() @IsIn(['GENERAL', 'DENTAL', 'SURGERY', 'RADIOLOGY', 'OBGYN', 'OPHTHALMOLOGY', 'UROLOGY', 'BEAUTY', 'LAB'])
   specialty!: string;
 
   @IsString()

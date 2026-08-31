@@ -2,7 +2,7 @@ import { IsEmail, IsIn, IsString, Matches, MaxLength, MinLength } from 'class-va
 
 export class RegisterClinicDto {
   @IsString() @IsIn(['CLINIC', 'HOSPITAL', 'CENTER', 'RADIOLOGY_CENTER']) facilityType!: string;
-  @IsString() @IsIn(['GENERAL', 'DENTAL', 'SURGERY', 'RADIOLOGY', 'OBGYN', 'OPHTHALMOLOGY', 'UROLOGY', 'BEAUTY']) specialty!: string;
+  @IsString() @IsIn(['GENERAL', 'DENTAL', 'SURGERY', 'RADIOLOGY', 'OBGYN', 'OPHTHALMOLOGY', 'UROLOGY', 'BEAUTY', 'LAB']) specialty!: string;
   @IsString() @MinLength(2) @MaxLength(120) clinicName!: string;
   @IsString() @MinLength(2) @MaxLength(80) firstName!: string;
   @IsString() @MinLength(2) @MaxLength(80) lastName!: string;

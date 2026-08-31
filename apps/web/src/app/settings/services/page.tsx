@@ -7,7 +7,7 @@ import { authenticatedFetch, getAccessToken, hasSessionPermission } from '@/lib/
 
 type Service = { id: string; name: string; specialty: string; durationMinutes: number; price: number | null; isActive: boolean };
 
-const specialtyLabels: Record<string, string> = { GENERAL: 'طب عام', DENTAL: 'أسنان', SURGERY: 'جراحة', RADIOLOGY: 'أشعة', OBGYN: 'نساء وتوليد', OPHTHALMOLOGY: 'عيون وليزك', UROLOGY: 'مسالك بولية', BEAUTY: 'تجميل وبيوتي' };
+const specialtyLabels: Record<string, string> = { GENERAL: 'طب عام', DENTAL: 'أسنان', SURGERY: 'جراحة', RADIOLOGY: 'أشعة', OBGYN: 'نساء وتوليد', OPHTHALMOLOGY: 'عيون وليزك', UROLOGY: 'مسالك بولية', BEAUTY: 'تجميل وبيوتي', LAB: 'معمل تحاليل' };
 const emptyForm = { name: '', durationMinutes: '30', price: '' };
 
 export default function ServicesSettingsPage() {
