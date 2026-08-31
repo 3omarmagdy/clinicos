@@ -39,10 +39,11 @@ export class OrganizationService {
   async listServices(organizationId: string) {
     const organization = await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { specialty: true } });
     if (!organization) return [];
-    const existing = await this.prisma.service.findMany({ where: { organizationId, isActive: true }, orderBy: { name: 'asc' } });
-    if (existing.length) return existing;
+    const existing = await this.prisma.service.findMany({ where: { organizationId }, select: { name: true } });
+    const existingNames = new Set(existing.map((service) => service.name));
     const defaults = this.defaultServices[organization.specialty] || this.defaultServices.GENERAL;
-    await this.prisma.service.createMany({ data: defaults.map((service) => ({ ...service, organizationId, specialty: organization.specialty })) });
+    const missing = defaults.filter((service) => !existingNames.has(service.name));
+    if (missing.length) await this.prisma.service.createMany({ data: missing.map((service) => ({ ...service, organizationId, specialty: organization.specialty })) });
     return this.prisma.service.findMany({ where: { organizationId, isActive: true }, orderBy: { name: 'asc' } });
   }
 
