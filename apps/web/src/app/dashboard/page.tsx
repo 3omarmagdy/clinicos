@@ -136,6 +136,7 @@ export default function DashboardPage() {
               <Action href="/patients" title={reception ? specialtyAction.patients : doctor ? 'ملفات المرضى والسجل الطبي' : specialtyAction.patients} text={reception ? 'سجّل مريضًا جديدًا أو افتح ملفًا موجودًا.' : doctor ? 'افتح الملف لتسجيل الملاحظات أو الوصفة.' : 'عرض وتحديث ملفات المرضى.'} />
               {owner && <Action href="/team" title="فريق العيادة" text="أضف أعضاء الفريق وحدد دور كل شخص." tone="teal" />}
               {owner && <Action href="/settings" title="إعدادات العيادة" text="اضبط اسم العيادة وبيانات التشغيل والطباعة." />}
+              {owner && <Action href="/settings/services" title="كتالوج الخدمات" text="أضف وعدّل وعطّل خدمات تخصص العيادة، وتظهر في الحجز والعروض." tone="teal" />}
               {owner && <Action href="/settings/subscription" title="الاشتراك والفوترة" text="راجع خطتك وحدود الاستخدام وطلبات التفعيل." tone="teal" />}
               {owner && <Action href="/campaigns" title="عروض WhatsApp" text={`${specialtyAction.campaign} — راجع المستلمين قبل الإرسال.`} tone="teal" />}
               {doctor && <Action href="/patients" title="الوصفة الإلكترونية" text="افتح ملف المريض ثم أنشئ وصفة قابلة للطباعة." tone="teal" />}
