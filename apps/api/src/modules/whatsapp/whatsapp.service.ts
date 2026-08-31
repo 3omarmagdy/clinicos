@@ -118,6 +118,11 @@ export class WhatsAppService {
   private asArray(value: unknown): unknown[] { return Array.isArray(value) ? value : []; }
 
   async sendTestReminder(appointmentId: string, organizationId: string): Promise<ReminderResult> {
+    const integration = this.integrations ? await this.integrations.getForOrganization(organizationId) : null;
+    if (!integration) return { appointmentId, status: 'failed', reason: 'whatsapp_not_configured' };
+    if (!integration.enabled) return { appointmentId, status: 'failed', reason: 'clinic_whatsapp_disabled' };
+    if (process.env.WHATSAPP_SEND_ENABLED !== 'true') return { appointmentId, status: 'failed', reason: 'whatsapp_send_disabled' };
+
     const appointment = await this.prisma.appointment.findFirst({
       where: { id: appointmentId, organizationId },
       include: {
