@@ -7,6 +7,37 @@ import { SubscriptionService } from '../subscription/subscription.service';
 const patientSelect = { id: true, firstName: true, lastName: true, medicalRecordNumber: true, phone: true } as const;
 const doctorSelect = { id: true, firstName: true, lastName: true, email: true } as const;
 const unavailableAppointmentStatuses = ['cancelled', 'no_show'];
+const cairoFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Africa/Cairo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** Return the UTC instant that represents midnight for a Cairo calendar day. */
+function cairoDayStart(date: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  const guessedUtc = Date.UTC(year, month - 1, day);
+  const parts = cairoFormatter.formatToParts(new Date(guessedUtc));
+  const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)])) as Record<string, number>;
+  const displayedAsUtc = Date.UTC(values.year, values.month - 1, values.day, values.hour, values.minute, values.second);
+  return new Date(guessedUtc - (displayedAsUtc - guessedUtc));
+}
+
+function cairoDateString(date: Date): string {
+  const values = Object.fromEntries(cairoFormatter.formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)])) as Record<string, number>;
+  return `${values.year}-${String(values.month).padStart(2, '0')}-${String(values.day).padStart(2, '0')}`;
+}
+
+function nextCalendarDay(date: string): string {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + 1);
+  return value.toISOString().slice(0, 10);
+}
 
 @Injectable()
 export class AppointmentService {
@@ -18,8 +49,10 @@ export class AppointmentService {
 
   async list(organizationId: string, query: AppointmentQueryDto) {
     const today = new Date();
-    const start = query.from ? new Date(query.from) : new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const end = query.to ? new Date(query.to) : new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+    const cairoToday = cairoDateString(today);
+    const from = query.from || cairoToday;
+    const start = cairoDayStart(from);
+    const end = query.to ? cairoDayStart(query.to) : cairoDayStart(nextCalendarDay(from));
     return this.prisma.appointment.findMany({
       where: { organizationId, scheduledAt: { gte: start, lt: end }, ...(query.doctorId ? { doctorId: query.doctorId } : {}) },
       include: { patient: { select: patientSelect }, doctor: { select: doctorSelect }, service: true, visit: true },
