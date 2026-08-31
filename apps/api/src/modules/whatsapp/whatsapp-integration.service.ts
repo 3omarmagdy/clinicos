@@ -153,6 +153,30 @@ export class WhatsAppIntegrationService {
         ADD COLUMN IF NOT EXISTS "enabled" BOOLEAN DEFAULT false,
         ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
         ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3);
+
+      -- The earliest tenant-specific schema stored per-clinic app secrets and
+      -- verify tokens. They are now centralized in Vercel and must stay out
+      -- of this table, so legacy NOT NULL constraints must not block a save.
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'whatsapp_integrations'
+            AND column_name = 'appSecretCiphertext'
+        ) THEN
+          ALTER TABLE "whatsapp_integrations" ALTER COLUMN "appSecretCiphertext" DROP NOT NULL;
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'whatsapp_integrations'
+            AND column_name = 'webhookVerifyTokenHash'
+        ) THEN
+          ALTER TABLE "whatsapp_integrations" ALTER COLUMN "webhookVerifyTokenHash" DROP NOT NULL;
+        END IF;
+      END $$;
     `).then(() => undefined).catch(() => {
       this.legacySchemaRepair = null;
       throw new ServiceUnavailableException('تعذر تجهيز قاعدة بيانات WhatsApp. راجع اتصال قاعدة البيانات ثم أعد المحاولة.');
