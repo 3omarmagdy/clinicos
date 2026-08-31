@@ -55,6 +55,28 @@ interface PatientForm {
   status: 'active' | 'inactive';
 }
 
+const maritalStatusAliases: Record<string, PatientForm['maritalStatus']> = {
+  single: 'single',
+  married: 'married',
+  divorced: 'divorced',
+  widowed: 'widowed',
+  other: 'other',
+  'أعزب': 'single',
+  'عزباء': 'single',
+  'متزوج': 'married',
+  'متزوجة': 'married',
+  'مطلق': 'divorced',
+  'مطلقة': 'divorced',
+  'أرمل': 'widowed',
+  'أرملة': 'widowed',
+  'اخرى': 'other',
+  'أخرى': 'other',
+};
+
+function normalizeMaritalStatus(value?: string | null) {
+  return maritalStatusAliases[value?.trim().toLowerCase() || ''] || '';
+}
+
 function toFormValues(patient: Patient): PatientForm {
   return {
     medicalRecordNumber: patient.medicalRecordNumber,
@@ -63,7 +85,7 @@ function toFormValues(patient: Patient): PatientForm {
     dateOfBirth: patient.dateOfBirth?.slice(0, 10) || '',
     admittedAt: patient.admittedAt.slice(0, 10),
     gender: patient.gender || '',
-    maritalStatus: patient.maritalStatus || '',
+    maritalStatus: normalizeMaritalStatus(patient.maritalStatus),
     phone: patient.phone || '',
     whatsappPhone: patient.whatsappPhone || '',
     whatsappOptIn: patient.whatsappOptIn,
@@ -136,6 +158,7 @@ export default function EditPatientPage({ params }: { params: { id: string } }) 
           dateOfBirth: formValues.dateOfBirth || undefined,
           admittedAt: formValues.admittedAt || undefined,
           gender: formValues.gender || undefined,
+          maritalStatus: normalizeMaritalStatus(formValues.maritalStatus) || undefined,
           phone: formValues.phone || undefined,
           whatsappPhone: formValues.whatsappPhone || undefined,
           whatsappOptIn: formValues.whatsappOptIn,
