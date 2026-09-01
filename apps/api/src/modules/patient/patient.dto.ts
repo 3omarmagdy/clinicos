@@ -1,5 +1,7 @@
 import {
   ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -123,6 +125,20 @@ export class UpdatePatientDto {
   @IsOptional()
   @IsIn(['active', 'inactive'])
   status?: 'active' | 'inactive';
+}
+
+export class BulkDeletePatientsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(2_500)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  patientIds!: string[];
+
+  @IsInt()
+  @Min(1)
+  confirmationCount!: number;
 }
 
 export class PatientQueryDto {

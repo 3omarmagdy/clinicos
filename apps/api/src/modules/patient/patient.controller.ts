@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
 import type { AuthContext, Patient } from '@clinicos/shared-types';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { PermissionsGuard } from '../auth/permissions.guard';
-import { CreatePatientDto, ImportPatientsDto, MarketingAudienceQueryDto, PatientQueryDto, UpdatePatientDto } from './patient.dto';
+import { BulkDeletePatientsDto, CreatePatientDto, ImportPatientsDto, MarketingAudienceQueryDto, PatientQueryDto, UpdatePatientDto } from './patient.dto';
 import { PatientService } from './patient.service';
 
 @Controller('patients')
@@ -40,6 +40,11 @@ export class PatientController {
   @Post('import') @RequirePermissions('patient:create')
   import(@Body() data: ImportPatientsDto, @Req() req: { user: AuthContext }) {
     return this.patients.import(req.user.organizationId, data.patients, req.user.userId);
+  }
+
+  @Delete('bulk') @RequirePermissions('patient:update')
+  bulkDelete(@Body() data: BulkDeletePatientsDto, @Req() req: { user: AuthContext }) {
+    return this.patients.bulkDelete(req.user.organizationId, data.patientIds, data.confirmationCount, req.user.userId);
   }
 
   @Post(':id/whatsapp-reminders-opt-out') @RequirePermissions('patient:update')

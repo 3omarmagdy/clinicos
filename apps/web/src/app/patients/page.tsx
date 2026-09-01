@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api-error';
-import { authenticatedFetch, getAccessToken } from '@/lib/auth-session';
+import { authenticatedFetch, getAccessToken, hasSessionPermission } from '@/lib/auth-session';
 
 interface PatientListItem {
   id: string;
@@ -56,8 +56,11 @@ export default function PatientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [selectedPatientIds, setSelectedPatientIds] = useState<Set<string>>(new Set());
   const [formValues, setFormValues] = useState(emptyPatientForm);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const canDelete = hasSessionPermission('patient:update');
 
   const load = useCallback(async (searchQuery = '') => {
     if (!getAccessToken()) {
@@ -73,7 +76,9 @@ export default function PatientsPage() {
       const query = searchQuery.trim() ? `?search=${encodeURIComponent(searchQuery.trim())}` : '';
       const response = await authenticatedFetch(`/api/v1/patients${query}`);
       if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Unable to load patients.'));
-      setPatients(await response.json() as PatientListItem[]);
+      const records = await response.json() as PatientListItem[];
+      setPatients(records);
+      setSelectedPatientIds((current) => new Set([...current].filter((id) => records.some((patient) => patient.id === id))));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Unable to load patients.');
     } finally {
@@ -133,6 +138,50 @@ export default function PatientsPage() {
     }
   };
 
+  const togglePatient = (id: string) => {
+    setSelectedPatientIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllPatients = () => {
+    setSelectedPatientIds((current) => current.size === patients.length ? new Set() : new Set(patients.map((patient) => patient.id)));
+  };
+
+  const deleteSelected = async () => {
+    const patientIds = Array.from(selectedPatientIds);
+    if (!patientIds.length) return;
+
+    const count = patientIds.length;
+    if (!window.confirm(`سيتم حذف ${count} ملف مريض نهائيًا، بما يشمل البيانات المرتبطة به. هل تريد المتابعة؟`)) return;
+    if (window.prompt(`للتأكيد، اكتب العدد ${count} كما هو:`) !== String(count)) {
+      setError('لم يتم الحذف لأن رقم التأكيد غير صحيح.');
+      return;
+    }
+
+    setDeleting(true);
+    setError('');
+    try {
+      const response = await authenticatedFetch('/api/v1/patients/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientIds, confirmationCount: count }),
+      });
+      if (!response.ok) throw new Error(await getApiErrorMessage(response, 'Unable to delete the selected patients.'));
+      const result = await response.json() as { deleted: number };
+      setPatients((current) => current.filter((patient) => !selectedPatientIds.has(patient.id)));
+      setSelectedPatientIds(new Set());
+      setError('');
+      window.alert(`تم حذف ${result.deleted} ملف مريض نهائيًا.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Unable to delete the selected patients.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <main dir="rtl" className="min-h-screen bg-[#f5f9fd] px-4 py-6 text-[#10233d] sm:py-10">
       <section className="mx-auto max-w-6xl rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#dce7f1] sm:p-8">
@@ -152,6 +201,12 @@ export default function PatientsPage() {
           <label htmlFor="patient-search" className="sr-only">Search patients</label>
           <input id="patient-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث بالاسم أو MRN أو رقم الهاتف" className="field" />
         </div>
+
+        {canDelete && patients.length > 0 && <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          <label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={selectedPatientIds.size === patients.length} onChange={toggleAllPatients} /> تحديد كل نتائج البحث الحالية ({patients.length})</label>
+          <span>{selectedPatientIds.size ? `تم تحديد ${selectedPatientIds.size} ملف` : 'اختر الملفات الوهمية فقط قبل الحذف.'}</span>
+          <button type="button" onClick={() => void deleteSelected()} disabled={!selectedPatientIds.size || deleting} className="rounded-lg bg-red-700 px-4 py-2 font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">{deleting ? 'جارٍ الحذف…' : `حذف المحدد (${selectedPatientIds.size})`}</button>
+        </div>}
 
         <form onSubmit={create} className="mt-5 grid gap-4 rounded-2xl border border-[#dce7f1] bg-[#fbfdff] p-5 sm:grid-cols-2">
           <div className="sm:col-span-2"><p className="text-xs font-extrabold tracking-[.14em] text-[#1768a8]">NEW PATIENT</p><h2 className="mt-1 text-xl font-extrabold text-[#173b63]">تسجيل مريض جديد</h2></div>
@@ -180,7 +235,8 @@ export default function PatientsPage() {
           {loading ? <p className="p-4 text-slate-600">Loading patients…</p> : patients.length === 0 ? <p className="p-4 text-slate-600">{search.trim() ? 'No patients match that search.' : 'No patients yet. Add the first patient above.'}</p> : (
             <ul>
               {patients.map((patient) => (
-                <li key={patient.id} className="border-b p-4 last:border-0">
+                <li key={patient.id} className="flex items-center gap-3 border-b p-4 last:border-0">
+                  {canDelete && <input aria-label={`اختيار ${patient.firstName} ${patient.lastName}`} type="checkbox" checked={selectedPatientIds.has(patient.id)} onChange={() => togglePatient(patient.id)} className="h-4 w-4 shrink-0" />}
                   <Link href={`/patients/${patient.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md hover:bg-slate-50">
                     <span>
                       <span className="font-medium text-slate-900">{patient.firstName} {patient.lastName}</span>

@@ -117,6 +117,25 @@ export class WhatsAppService {
   private isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
   private asArray(value: unknown): unknown[] { return Array.isArray(value) ? value : []; }
 
+  async sendTestReminder(appointmentId: string, organizationId: string): Promise<ReminderResult> {
+    const integration = this.integrations ? await this.integrations.getForOrganization(organizationId) : null;
+    if (!integration) return { appointmentId, status: 'failed', reason: 'whatsapp_not_configured' };
+    if (!integration.enabled) return { appointmentId, status: 'failed', reason: 'clinic_whatsapp_disabled' };
+    if (process.env.WHATSAPP_SEND_ENABLED !== 'true') return { appointmentId, status: 'failed', reason: 'whatsapp_send_disabled' };
+
+    const appointment = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, organizationId },
+      include: {
+        patient: true,
+        doctor: { select: { firstName: true, lastName: true } },
+        organization: { select: { name: true, timezone: true, subscriptionPlan: true } },
+      },
+    });
+    if (!appointment) return { appointmentId, status: 'failed', reason: 'appointment_not_found' };
+    if (appointment.whatsappReminderSentAt) return { appointmentId, status: 'skipped', reason: 'reminder_already_sent' };
+    return this.sendForAppointment(appointment);
+  }
+
   async runDueReminders(): Promise<{ windowStart: string; windowEnd: string; results: ReminderResult[] }> {
     const now = new Date();
     const leadMs = this.reminderLeadHours() * 60 * 60 * 1000;
@@ -223,11 +242,13 @@ export class WhatsAppService {
         headers: { Authorization: `Bearer ${config.accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }) as unknown as WhatsAppApiResponse;
-      const responseBody = await response.json() as { messages?: Array<{ id?: string }>; error?: { message?: string } };
+      const responseBody = await response.json() as { messages?: Array<{ id?: string }>; error?: { code?: number; message?: string; error_data?: { details?: string } } };
       if (!response.ok) {
-        this.logger.error(`WhatsApp delivery failed for appointment ${appointment.id}: ${response.status} ${responseBody.error?.message || 'unknown error'}`);
-        await this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'FAILED', failureReason: 'provider_rejected_message', failedAt: new Date() } });
-        return { appointmentId: appointment.id, status: 'failed', reason: 'provider_rejected_message' };
+        const providerCode = responseBody.error?.code;
+        const safeReason = providerCode ? `provider_rejected_message_${providerCode}` : 'provider_rejected_message';
+        this.logger.error(`WhatsApp delivery failed for appointment ${appointment.id}: ${response.status} code=${providerCode || 'unknown'} ${responseBody.error?.message || 'unknown error'}`);
+        await this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'FAILED', failureReason: safeReason, failedAt: new Date() } });
+        return { appointmentId: appointment.id, status: 'failed', reason: safeReason };
       }
       const messageId = responseBody.messages?.[0]?.id;
       if (!messageId) {
