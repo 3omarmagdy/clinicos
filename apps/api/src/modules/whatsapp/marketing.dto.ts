@@ -22,10 +22,16 @@ export class SendMarketingCampaignDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) maxRecipients?: number;
 }
 
+/** A deliberately explicit, single-recipient onboarding check. */
+export class SendTestReminderDto {
+  @IsString() @MinLength(8) @MaxLength(100) appointmentId!: string;
+  @IsBoolean() confirm!: boolean;
+}
+
 export class UpsertWhatsAppIntegrationDto {
   @IsString() @Matches(/^[A-Za-z0-9_-]{6,80}$/) phoneNumberId!: string;
   @IsString() @Matches(/^[A-Za-z0-9_-]{6,100}$/) wabaId!: string;
-  @IsString() @MinLength(20) @MaxLength(4096) accessToken!: string;
+  @IsOptional() @IsString() @MinLength(20) @MaxLength(4096) accessToken?: string;
   @IsOptional() @IsString() @Matches(/^v\d+\.\d+$/) apiVersion?: string;
   @IsString() @Matches(/^[A-Za-z0-9_]{1,100}$/) appointmentTemplate!: string;
   @IsOptional() @IsString() @Matches(/^[A-Za-z0-9_]{1,100}$/) marketingTemplate?: string;

@@ -4,7 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import type { AuthContext } from '@clinicos/shared-types';
-import { CompleteEmbeddedWhatsAppSignupDto, CreateMarketingCampaignDto, SendMarketingCampaignDto, UpsertWhatsAppIntegrationDto } from './marketing.dto';
+import { CompleteEmbeddedWhatsAppSignupDto, CreateMarketingCampaignDto, SendMarketingCampaignDto, SendTestReminderDto, UpsertWhatsAppIntegrationDto } from './marketing.dto';
 import { WhatsAppMarketingService } from './whatsapp-marketing.service';
 import { WhatsAppService } from './whatsapp.service';
 import { WhatsAppIntegrationService } from './whatsapp-integration.service';
@@ -46,11 +46,26 @@ export class WhatsAppController {
     return this.runReminders(authorization);
   }
 
+  @Post('reminders/test')
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:update')
+  sendTestReminder(@Body() data: SendTestReminderDto, @Req() req: { user: AuthContext }) {
+    if (!data.confirm) throw new UnauthorizedException('A test reminder must be explicitly confirmed.');
+    return this.whatsapp.sendTestReminder(req.user.organizationId, data.appointmentId);
+  }
+
   @Get('integration')
   @UseGuards(AuthGuard('jwt'), PermissionsGuard)
   @RequirePermissions('organization:read')
   integrationSummary(@Req() req: { user: AuthContext }) {
     return this.integrations.summary(req.user.organizationId);
+  }
+
+  @Get('integration/templates')
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions('organization:update')
+  approvedTemplates(@Req() req: { user: AuthContext }) {
+    return this.integrations.approvedTemplates(req.user.organizationId);
   }
 
   @Put('integration')

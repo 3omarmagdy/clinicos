@@ -17,7 +17,7 @@ export type WhatsAppIntegrationConfig = {
 type IntegrationInput = {
   phoneNumberId: string;
   wabaId: string;
-  accessToken: string;
+  accessToken?: string;
   apiVersion?: string;
   appointmentTemplate: string;
   marketingTemplate?: string;
@@ -28,6 +28,7 @@ type IntegrationInput = {
 type EncryptedValue = { ciphertext: string; iv: string; authTag: string };
 type MetaGraphResponse = { ok: boolean; json(): Promise<unknown> };
 type MetaTokenResponse = { access_token?: string; error?: { code?: number } };
+type MetaTemplate = { name?: unknown; language?: unknown; status?: unknown; category?: unknown; components?: unknown };
 type IntegrationRecord = {
   organizationId: string;
   phoneNumberId: string;
@@ -50,7 +51,8 @@ export class WhatsAppIntegrationService {
 
   async upsert(organizationId: string, input: IntegrationInput): Promise<void> {
     await this.ensureLegacyIntegrationSchema();
-    const accessToken = input.accessToken.trim();
+    const existing = await this.prisma.whatsAppIntegration.findUnique({ where: { organizationId } }) as IntegrationRecord | null;
+    const accessToken = input.accessToken?.trim() || (existing ? this.decryptRecord(existing).accessToken : '');
     if (!accessToken) throw new BadRequestException('Access Token مطلوب لحفظ إعدادات WhatsApp.');
     // A temporary Cloud API token can send messages but may not be allowed to
     // read phone-number metadata. Do not block a disabled configuration on a
@@ -93,6 +95,31 @@ export class WhatsAppIntegrationService {
     await this.ensureLegacyIntegrationSchema();
     const record = await this.prisma.whatsAppIntegration.findUnique({ where: { organizationId }, select: { phoneNumberId: true, wabaId: true, appointmentTemplate: true, marketingTemplate: true, templateLanguage: true, apiVersion: true, enabled: true, updatedAt: true } });
     return record ? { configured: true, ...record } : { configured: false };
+  }
+
+  /** Lists the exact approved templates and language codes for this clinic. */
+  async approvedTemplates(organizationId: string) {
+    const integration = await this.getForOrganization(organizationId);
+    if (!integration) throw new BadRequestException('اربط WhatsApp Business أولًا قبل قراءة القوالب المعتمدة.');
+
+    const params = new URLSearchParams({ fields: 'name,language,status,category,components', limit: '250', access_token: integration.accessToken });
+    try {
+      const response = await fetch(`https://graph.facebook.com/${integration.apiVersion}/${integration.wabaId}/message_templates?${params.toString()}`) as unknown as MetaGraphResponse;
+      const body = await response.json() as { data?: unknown; error?: { message?: string; code?: number } };
+      if (!response.ok || !Array.isArray(body.data)) {
+        throw new Error(body.error?.message || 'Meta did not return templates');
+      }
+      return body.data.flatMap((item) => {
+        const template = item as MetaTemplate;
+        if (template.status !== 'APPROVED' || typeof template.name !== 'string' || typeof template.language !== 'string') return [];
+        const bodyComponent = Array.isArray(template.components) ? template.components.find((component) => typeof component === 'object' && component !== null && (component as { type?: unknown }).type === 'BODY') as { text?: unknown } | undefined : undefined;
+        const bodyText = typeof bodyComponent?.text === 'string' ? bodyComponent.text : '';
+        const parameterCount = (bodyText.match(/{{\d+}}/g) || []).length;
+        return [{ name: template.name, language: template.language, category: typeof template.category === 'string' ? template.category : null, parameterCount }];
+      });
+    } catch (error) {
+      throw new BadRequestException(`تعذر قراءة القوالب المعتمدة من Meta: ${error instanceof Error ? error.message : 'تحقق من صلاحيات Access Token.'}`);
+    }
   }
 
   async getForOrganization(organizationId: string): Promise<WhatsAppIntegrationConfig | null> {
