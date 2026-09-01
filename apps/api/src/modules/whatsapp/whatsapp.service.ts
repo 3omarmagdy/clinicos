@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional, UnauthorizedException } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PLAN_CATALOG } from '../subscription/subscription.service';
@@ -117,25 +117,6 @@ export class WhatsAppService {
   private isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
   private asArray(value: unknown): unknown[] { return Array.isArray(value) ? value : []; }
 
-  async sendTestReminder(appointmentId: string, organizationId: string): Promise<ReminderResult> {
-    const integration = this.integrations ? await this.integrations.getForOrganization(organizationId) : null;
-    if (!integration) return { appointmentId, status: 'failed', reason: 'whatsapp_not_configured' };
-    if (!integration.enabled) return { appointmentId, status: 'failed', reason: 'clinic_whatsapp_disabled' };
-    if (process.env.WHATSAPP_SEND_ENABLED !== 'true') return { appointmentId, status: 'failed', reason: 'whatsapp_send_disabled' };
-
-    const appointment = await this.prisma.appointment.findFirst({
-      where: { id: appointmentId, organizationId },
-      include: {
-        patient: true,
-        doctor: { select: { firstName: true, lastName: true } },
-        organization: { select: { name: true, timezone: true, subscriptionPlan: true } },
-      },
-    });
-    if (!appointment) return { appointmentId, status: 'failed', reason: 'appointment_not_found' };
-    if (appointment.whatsappReminderSentAt) return { appointmentId, status: 'skipped', reason: 'reminder_already_sent' };
-    return this.sendForAppointment(appointment);
-  }
-
   async runDueReminders(): Promise<{ windowStart: string; windowEnd: string; results: ReminderResult[] }> {
     const now = new Date();
     const leadMs = this.reminderLeadHours() * 60 * 60 * 1000;
@@ -165,6 +146,23 @@ export class WhatsAppService {
     return { windowStart: windowStart.toISOString(), windowEnd: windowEnd.toISOString(), results };
   }
 
+  /** Sends one owner-confirmed onboarding message without enabling global sends. */
+  async sendTestReminder(organizationId: string, appointmentId: string): Promise<ReminderResult> {
+    const appointment = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, organizationId },
+      include: {
+        patient: true,
+        doctor: { select: { firstName: true, lastName: true } },
+        organization: { select: { name: true, timezone: true, subscriptionPlan: true } },
+      },
+    });
+    if (!appointment) throw new NotFoundException('Appointment not found in this clinic.');
+    if (!['scheduled', 'confirmed'].includes(appointment.status)) throw new BadRequestException('Only a scheduled or confirmed appointment can receive a test reminder.');
+    if (!appointment.patient.whatsappOptIn) throw new BadRequestException('The patient has not opted in to WhatsApp appointment reminders.');
+    if (appointment.whatsappReminderSentAt) throw new ConflictException('A reminder was already sent for this appointment.');
+    return this.sendForAppointment(appointment, { allowTest: true, bypassQuota: true });
+  }
+
   private async sendForAppointment(appointment: {
     id: string;
     organizationId: string;
@@ -172,23 +170,25 @@ export class WhatsAppService {
     patient: { id: string; firstName: string; phone: string | null; whatsappPhone: string | null; whatsappOptIn: boolean };
     doctor: { firstName: string; lastName: string } | null;
     organization: { name: string; timezone: string; subscriptionPlan: string };
-  }): Promise<ReminderResult> {
+  }, options: { allowTest?: boolean; bypassQuota?: boolean } = {}): Promise<ReminderResult> {
     if (!appointment.patient.whatsappOptIn) return { appointmentId: appointment.id, status: 'skipped', reason: 'patient_not_opted_in' };
     const to = this.normalizePhone(appointment.patient.whatsappPhone || appointment.patient.phone);
     if (!to) return { appointmentId: appointment.id, status: 'skipped', reason: 'missing_or_invalid_phone' };
 
-    const config = await this.configuration(appointment.organizationId);
+    const config = await this.configuration(appointment.organizationId, options.allowTest);
     if (!config) return { appointmentId: appointment.id, status: 'skipped', reason: 'whatsapp_not_configured' };
 
-    const currentMonthStart = new Date();
-    currentMonthStart.setDate(1);
-    currentMonthStart.setHours(0, 0, 0, 0);
-    const usedThisMonth = await this.prisma.appointment.count({ where: { organizationId: appointment.organizationId, whatsappReminderSentAt: { gte: currentMonthStart } } });
-    const planLimit = this.monthlyLimitForPlan(appointment.organization.subscriptionPlan);
-    const globalLimit = config.monthlyLimit;
-    const effectiveLimit = planLimit === null ? globalLimit : globalLimit === null ? planLimit : Math.min(planLimit, globalLimit);
-    if (effectiveLimit === 0) return { appointmentId: appointment.id, status: 'skipped', reason: 'whatsapp_not_included_in_plan' };
-    if (effectiveLimit !== null && usedThisMonth >= effectiveLimit) return { appointmentId: appointment.id, status: 'skipped', reason: 'monthly_reminder_limit_reached' };
+    if (!options.bypassQuota) {
+      const currentMonthStart = new Date();
+      currentMonthStart.setDate(1);
+      currentMonthStart.setHours(0, 0, 0, 0);
+      const usedThisMonth = await this.prisma.appointment.count({ where: { organizationId: appointment.organizationId, whatsappReminderSentAt: { gte: currentMonthStart } } });
+      const planLimit = this.monthlyLimitForPlan(appointment.organization.subscriptionPlan);
+      const globalLimit = config.monthlyLimit;
+      const effectiveLimit = planLimit === null ? globalLimit : globalLimit === null ? planLimit : Math.min(planLimit, globalLimit);
+      if (effectiveLimit === 0) return { appointmentId: appointment.id, status: 'skipped', reason: 'whatsapp_not_included_in_plan' };
+      if (effectiveLimit !== null && usedThisMonth >= effectiveLimit) return { appointmentId: appointment.id, status: 'skipped', reason: 'monthly_reminder_limit_reached' };
+    }
 
     const dateFormatter = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'full', timeStyle: 'short', timeZone: appointment.organization.timezone || 'Africa/Cairo' });
     const doctorName = appointment.doctor ? `${appointment.doctor.firstName} ${appointment.doctor.lastName}`.trim() : 'فريق العيادة';
@@ -247,10 +247,10 @@ export class WhatsAppService {
     }
   }
 
-  private async configuration(organizationId: string) {
+  private async configuration(organizationId: string, allowTest = false) {
     if (this.integrations) {
       const integration = await this.integrations.getForOrganization(organizationId);
-      if (!integration || !integration.enabled || process.env.WHATSAPP_SEND_ENABLED !== 'true') return null;
+      if (!integration || (!allowTest && (!integration.enabled || process.env.WHATSAPP_SEND_ENABLED !== 'true'))) return null;
       return { accessToken: integration.accessToken, phoneNumberId: integration.phoneNumberId, template: integration.appointmentTemplate, language: integration.templateLanguage, apiVersion: integration.apiVersion, monthlyLimit: this.monthlyMessageLimit() };
     }
     if (process.env.NODE_ENV !== 'test') return null;
