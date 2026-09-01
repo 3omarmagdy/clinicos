@@ -38,7 +38,7 @@ export class WhatsAppController {
   @UseGuards(AuthGuard('jwt'), PermissionsGuard)
   @RequirePermissions('appointment:update')
   async testAppointmentReminder(@Param('id') id: string, @Req() req: { user: AuthContext }) {
-    return this.whatsapp.sendTestReminder(id, req.user.organizationId);
+    return this.whatsapp.sendTestReminder(req.user.organizationId, id);
   }
 
   @Post('reminders/run')
