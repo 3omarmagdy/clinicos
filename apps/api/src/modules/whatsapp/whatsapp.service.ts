@@ -148,6 +148,7 @@ export class WhatsAppService {
 
   /** Sends one owner-confirmed onboarding message without enabling global sends. */
   async sendTestReminder(organizationId: string, appointmentId: string): Promise<ReminderResult> {
+    await this.integrations?.assertAppointmentTemplateReady(organizationId);
     const appointment = await this.prisma.appointment.findFirst({
       where: { id: appointmentId, organizationId },
       include: {

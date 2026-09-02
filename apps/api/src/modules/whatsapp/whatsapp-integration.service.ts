@@ -122,6 +122,21 @@ export class WhatsAppIntegrationService {
     }
   }
 
+  /** Stops an outbound test before Meta is called when its saved template is invalid. */
+  async assertAppointmentTemplateReady(organizationId: string): Promise<void> {
+    const integration = await this.getForOrganization(organizationId);
+    if (!integration) throw new BadRequestException('اربط WhatsApp Business أولًا.');
+    const template = (await this.approvedTemplates(organizationId)).find((item) => (
+      item.name === integration.appointmentTemplate && item.language === integration.templateLanguage
+    ));
+    if (!template) {
+      throw new BadRequestException('قالب الموعد المحفوظ غير موجود أو غير معتمد بهذه اللغة في Meta. افتح إعدادات WhatsApp، واقرأ القوالب المعتمدة ثم اختر القالب من القائمة واحفظه.');
+    }
+    if (template.parameterCount !== 4) {
+      throw new BadRequestException('قالب الموعد المختار يجب أن يحتوي أربعة متغيرات: اسم المريض، التاريخ والوقت، الطبيب، واسم العيادة.');
+    }
+  }
+
   async getForOrganization(organizationId: string): Promise<WhatsAppIntegrationConfig | null> {
     await this.ensureLegacyIntegrationSchema();
     const record = await this.prisma.whatsAppIntegration.findUnique({ where: { organizationId } }) as IntegrationRecord | null;
