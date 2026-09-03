@@ -139,6 +139,7 @@ model WhatsAppConnection {
   marketingTemplate    String?
   templateLanguage     String   @default("ar")
   reminderHoursBefore  Int      @default(24)
+  remindersEnabled     Boolean  @default(false)
   isEnabled            Boolean  @default(false)
   lastError            String?
   createdAt            DateTime @default(now())
@@ -160,6 +161,7 @@ model WhatsAppCampaign {
   scheduledAt    DateTime?
   status         String   @default("draft") // draft | scheduled | sending | completed | failed | cancelled
   sentAt         DateTime?
+  queueStartedAt  DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -178,6 +180,10 @@ model WhatsAppCampaignRecipient {
   status       String   @default("pending") // pending | sent | delivered | read | failed | skipped
   providerMessageId String?
   failureCode  String?
+  attempts     Int      @default(0)
+  lastError    String?
+  nextAttemptAt DateTime?
+  lockedAt     DateTime?
   sentAt       DateTime?
   deliveredAt  DateTime?
   readAt       DateTime?

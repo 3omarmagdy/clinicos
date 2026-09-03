@@ -15,12 +15,13 @@ export class WhatsAppAudienceDto {
 export class UpsertWhatsAppConnectionDto {
   @IsString() @Matches(/^\d+$/) phoneNumberId!: string;
   @IsString() @Matches(/^\d+$/) businessAccountId!: string;
-  @IsString() @Min(20) accessToken!: string;
+  @IsOptional() @IsString() @Min(20) accessToken?: string;
   @IsOptional() @Matches(/^v\d+\.\d+$/) apiVersion?: string;
   @IsOptional() @IsString() @MaxLength(512) appointmentTemplate?: string;
   @IsOptional() @IsString() @MaxLength(512) marketingTemplate?: string;
   @IsOptional() @IsString() @MaxLength(10) templateLanguage?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(168) reminderHoursBefore?: number;
+  @IsOptional() @IsBoolean() remindersEnabled?: boolean;
   @IsOptional() @IsBoolean() isEnabled?: boolean;
 }
 
