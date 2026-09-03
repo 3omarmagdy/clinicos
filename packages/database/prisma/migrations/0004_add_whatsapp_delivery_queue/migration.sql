@@ -7,3 +7,5 @@ ALTER TABLE "whatsapp_campaign_recipients"
   ADD COLUMN IF NOT EXISTS "lockedAt" TIMESTAMP(3);
 CREATE INDEX IF NOT EXISTS "whatsapp_campaign_recipients_status_nextAttemptAt_idx"
   ON "whatsapp_campaign_recipients"("status", "nextAttemptAt");
+CREATE UNIQUE INDEX IF NOT EXISTS "whatsapp_messages_appointmentId_key"
+  ON "whatsapp_messages"("appointmentId");

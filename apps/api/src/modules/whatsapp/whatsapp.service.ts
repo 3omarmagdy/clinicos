@@ -25,7 +25,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     void this.runWorkerCycle();
   }
   onModuleDestroy() { if (this.workerTimer) clearInterval(this.workerTimer); }
-  async runWorkerCycle() { try { await this.enqueueScheduledCampaigns(); await this.processQueue(); await this.processReminderSchedule(); } catch (error) { this.logger.error('WhatsApp worker cycle failed', error instanceof Error ? error.stack : undefined); } }
+  async runWorkerCycle() { try { await this.enqueueScheduledCampaigns(); await this.processReminderSchedule(); await this.processQueue(); await this.processReminderQueue(); } catch (error) { this.logger.error('WhatsApp worker cycle failed', error instanceof Error ? error.stack : undefined); } }
 
   private encryptionKey(): Buffer {
     const value = this.config.get<string>('WHATSAPP_TOKEN_ENCRYPTION_KEY');
@@ -179,13 +179,39 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       const appointments = await this.prisma.appointment.findMany({ where: { organizationId: connection.organizationId, status: 'booked', reminderSentAt: null, scheduledAt: { gte: after, lte: until }, patient: { marketingConsent: true } }, include: { patient: true } });
       for (const appointment of appointments) {
         const phone = this.normalizePhone(appointment.patient.phone); if (!phone) continue;
-        const claim = await this.prisma.appointment.updateMany({ where: { id: appointment.id, reminderSentAt: null }, data: { reminderSentAt: new Date() } });
-        if (claim.count !== 1) continue;
-        try { const result = await this.sendTemplate(connection, phone, connection.appointmentTemplate!, connection.templateLanguage); await this.prisma.whatsAppMessage.upsert({ where: { providerMessageId: result.id }, create: { organizationId: connection.organizationId, patientId: appointment.patientId, appointmentId: appointment.id, direction: 'outbound', providerMessageId: result.id, status: 'sent', payload: { type: 'appointment_reminder' } }, update: { status: 'sent' } }); queued++; }
-        catch (error) { await this.prisma.appointment.update({ where: { id: appointment.id }, data: { reminderSentAt: null } }); this.logger.warn(`Reminder for ${appointment.id} failed: ${error instanceof Error ? error.message : 'unknown error'}`); }
+        const existing = await this.prisma.whatsAppMessage.findFirst({ where: { appointmentId: appointment.id, direction: 'outbound' }, select: { id: true } });
+        if (existing) continue;
+        try {
+          await this.prisma.whatsAppMessage.create({ data: { organizationId: connection.organizationId, patientId: appointment.patientId, appointmentId: appointment.id, direction: 'outbound', status: 'pending', payload: { type: 'appointment_reminder', phone, templateName: connection.appointmentTemplate, language: connection.templateLanguage } } });
+          queued++;
+        } catch (error) {
+          if (!(error && typeof error === 'object' && 'code' in error && error.code === 'P2002')) throw error;
+        }
       }
     }
     return queued;
+  }
+
+  private async processReminderQueue(limit = 20) {
+    const messages = await this.prisma.whatsAppMessage.findMany({ where: { direction: 'outbound', status: 'pending', appointmentId: { not: null } }, include: { patient: true }, take: limit, orderBy: { createdAt: 'asc' } });
+    for (const message of messages) {
+      const payload = message.payload as { phone?: string; templateName?: string; language?: string };
+      const phone = payload.phone ?? this.normalizePhone(message.patient?.phone ?? null);
+      if (!phone || !payload.templateName) { await this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'failed', payload: { ...payload, error: 'Invalid phone number or template' } } }); continue; }
+      const connection = await this.prisma.whatsAppConnection.findUnique({ where: { organizationId: message.organizationId } });
+      try {
+        if (!connection?.isEnabled) throw new Error('WhatsApp account disconnected');
+        const result = await this.sendTemplate(connection, phone, payload.templateName, payload.language ?? connection.templateLanguage);
+        await this.prisma.$transaction([
+          this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'sent', providerMessageId: result.id } }),
+          ...(message.appointmentId ? [this.prisma.appointment.update({ where: { id: message.appointmentId }, data: { reminderSentAt: new Date() } })] : []),
+        ]);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message.slice(0, 500) : 'WhatsApp API error';
+        await this.prisma.whatsAppMessage.update({ where: { id: message.id }, data: { status: 'failed', payload: { ...payload, error: reason } } });
+      }
+    }
+    return messages.length;
   }
 
   async handleWebhook(payload: unknown) {

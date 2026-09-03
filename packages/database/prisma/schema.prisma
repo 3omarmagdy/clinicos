@@ -215,6 +215,7 @@ model WhatsAppMessage {
   patient      Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, providerMessageId])
+  @@unique([appointmentId])
   @@map("whatsapp_messages")
 }
 
