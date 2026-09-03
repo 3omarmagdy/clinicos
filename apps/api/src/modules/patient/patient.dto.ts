@@ -1,4 +1,4 @@
-import { IsDateString, IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class CreatePatientDto {
   @IsString() @MinLength(1) @MaxLength(80) firstName!: string;
@@ -11,6 +11,8 @@ export class CreatePatientDto {
   @IsOptional() @IsString() @MaxLength(500) address?: string;
   @IsOptional() @IsString() @MaxLength(160) emergencyContactName?: string;
   @IsOptional() @IsString() @MaxLength(30) emergencyContactPhone?: string;
+  @IsOptional() @IsIn(['normal', 'regular', 'vip', 'new']) customerType?: string;
+  @IsOptional() @IsBoolean() marketingConsent?: boolean;
 }
 
 export class UpdatePatientDto {
@@ -24,6 +26,8 @@ export class UpdatePatientDto {
   @IsOptional() @IsString() @MaxLength(500) address?: string;
   @IsOptional() @IsString() @MaxLength(160) emergencyContactName?: string;
   @IsOptional() @IsString() @MaxLength(30) emergencyContactPhone?: string;
+  @IsOptional() @IsIn(['normal', 'regular', 'vip', 'new']) customerType?: string;
+  @IsOptional() @IsBoolean() marketingConsent?: boolean;
   @IsOptional() @IsIn(['active', 'inactive']) status?: 'active' | 'inactive';
 }
 

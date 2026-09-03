@@ -118,6 +118,11 @@ async function main() {
     // Appointment placeholder (for future)
     { code: 'appointment:read', category: 'appointment' },
     { code: 'appointment:create', category: 'appointment' },
+    { code: 'whatsapp:view', category: 'whatsapp' },
+    { code: 'whatsapp:connect', category: 'whatsapp' },
+    { code: 'whatsapp:campaign:view', category: 'whatsapp' },
+    { code: 'whatsapp:campaign:create', category: 'whatsapp' },
+    { code: 'whatsapp:campaign:send', category: 'whatsapp' },
   ];
 
   for (const perm of permissionCodes) {

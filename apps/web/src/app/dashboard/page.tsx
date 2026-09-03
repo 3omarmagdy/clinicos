@@ -79,6 +79,8 @@ export default function DashboardPage() {
         )}
         <div className="mt-6 border-t border-slate-200 pt-6">
           <Link href="/patients" className="inline-flex rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-800">Manage patients</Link>
+          <Link href="/settings/whatsapp" className="mr-3 inline-flex rounded-lg border border-sky-700 px-4 py-2 text-sm font-medium text-sky-800 hover:bg-sky-50">WhatsApp settings</Link>
+          <Link href="/whatsapp/campaigns" className="mr-3 inline-flex rounded-lg border border-sky-700 px-4 py-2 text-sm font-medium text-sky-800 hover:bg-sky-50">WhatsApp campaigns</Link>
         </div>
       </section>
     </main>

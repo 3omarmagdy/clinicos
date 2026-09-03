@@ -27,6 +27,12 @@ model Organization {
   users       User[]
   roles       Role[]
   patients    Patient[]
+  services    Service[]
+  appointments Appointment[]
+  patientTags PatientTag[]
+  whatsappConnection WhatsAppConnection?
+  whatsappCampaigns WhatsAppCampaign[]
+  whatsappMessages WhatsAppMessage[]
 
   @@map("organizations")
 }
@@ -51,15 +57,159 @@ model Patient {
   emergencyContactName  String?
   emergencyContactPhone String?
   status              String    @default("active") // active | inactive
+  customerType        String    @default("normal") // normal | regular | vip | new
+  marketingConsent    Boolean   @default(false)
+  marketingConsentAt  DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  tags         PatientTag[]
+  campaignRecipients WhatsAppCampaignRecipient[]
+  whatsappMessages WhatsAppMessage[]
 
   @@unique([organizationId, medicalRecordNumber])
   @@index([organizationId, lastName, firstName])
   @@index([organizationId, phone])
   @@map("patients")
+}
+
+model Service {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("services")
+}
+
+model Appointment {
+  id             String   @id @default(cuid())
+  organizationId String
+  patientId      String
+  serviceId      String?
+  doctorId       String?
+  scheduledAt    DateTime
+  status         String   @default("booked") // booked | completed | missed | cancelled
+  notes          String?
+  reminderSentAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  service      Service?     @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, scheduledAt])
+  @@index([patientId, scheduledAt])
+  @@map("appointments")
+}
+
+model PatientTag {
+  id             String   @id @default(cuid())
+  organizationId String
+  patientId      String
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, name])
+  @@index([organizationId, name])
+  @@map("patient_tags")
+}
+
+model WhatsAppConnection {
+  id                   String   @id @default(cuid())
+  organizationId       String   @unique
+  phoneNumberId        String
+  businessAccountId    String
+  accessTokenCiphertext String
+  apiVersion           String   @default("v21.0")
+  appointmentTemplate  String?
+  marketingTemplate    String?
+  templateLanguage     String   @default("ar")
+  reminderHoursBefore  Int      @default(24)
+  isEnabled            Boolean  @default(false)
+  lastError            String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_connections")
+}
+
+model WhatsAppCampaign {
+  id             String   @id @default(cuid())
+  organizationId String
+  createdById    String
+  name           String
+  templateName   String
+  templateLanguage String @default("ar")
+  audience       Json
+  scheduledAt    DateTime?
+  status         String   @default("draft") // draft | scheduled | sending | completed | failed | cancelled
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recipients   WhatsAppCampaignRecipient[]
+
+  @@index([organizationId, status])
+  @@map("whatsapp_campaigns")
+}
+
+model WhatsAppCampaignRecipient {
+  id           String   @id @default(cuid())
+  campaignId   String
+  patientId    String
+  phone        String
+  status       String   @default("pending") // pending | sent | delivered | read | failed | skipped
+  providerMessageId String?
+  failureCode  String?
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  readAt       DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  campaign WhatsAppCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  patient  Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, patientId])
+  @@index([campaignId, status])
+  @@map("whatsapp_campaign_recipients")
+}
+
+model WhatsAppMessage {
+  id             String   @id @default(cuid())
+  organizationId String
+  patientId      String?
+  appointmentId  String?
+  campaignRecipientId String?
+  direction      String   // outbound | inbound
+  providerMessageId String? @unique
+  status         String   @default("pending")
+  payload        Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patient      Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, providerMessageId])
+  @@map("whatsapp_messages")
 }
 
 // ============================================================================

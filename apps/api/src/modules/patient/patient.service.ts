@@ -37,7 +37,7 @@ export class PatientService {
   async create(organizationId: string, data: CreatePatientDto): Promise<Patient> {
     try {
       const patient = await this.prisma.patient.create({
-        data: { ...data, organizationId, dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined },
+        data: { ...data, organizationId, dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined, marketingConsentAt: data.marketingConsent ? new Date() : undefined },
       });
       return this.toPatient(patient);
     } catch (error: unknown) {
@@ -52,7 +52,7 @@ export class PatientService {
     await this.get(id, organizationId);
     try {
       const patient = await this.prisma.patient.update({
-        where: { id }, data: { ...data, dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined },
+        where: { id }, data: { ...data, dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined, marketingConsentAt: data.marketingConsent === true ? new Date() : data.marketingConsent === false ? null : undefined },
       });
       return this.toPatient(patient);
     } catch (error: unknown) {

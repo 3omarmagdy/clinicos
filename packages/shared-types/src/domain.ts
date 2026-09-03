@@ -26,6 +26,9 @@ export interface Location {
   email: string;
   timezone: string;
   status: 'active' | 'inactive';
+  customerType: 'normal' | 'regular' | 'vip' | 'new';
+  marketingConsent: boolean;
+  marketingConsentAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
