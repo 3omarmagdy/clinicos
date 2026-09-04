@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, ConflictException, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { AuthContext } from '@clinicos/shared-types';
 import { RequirePermissions } from '../auth/permissions.decorator';
@@ -31,4 +31,10 @@ export class WhatsAppController {
 
   @Post('campaigns/:id/send') @RequirePermissions('whatsapp:campaign:send')
   send(@Param('id') id: string, @Req() req: { user: AuthContext }) { return this.whatsapp.sendCampaign(req.user.organizationId, id); }
+
+  @Post('reminders/test') @RequirePermissions('whatsapp:campaign:send')
+  async testReminder(@Body('appointmentId') appointmentId: string, @Req() req: { user: AuthContext }) {
+    if (!appointmentId) throw new ConflictException('Appointment is required');
+    return this.whatsapp.sendReminderTest(req.user.organizationId, appointmentId);
+  }
 }

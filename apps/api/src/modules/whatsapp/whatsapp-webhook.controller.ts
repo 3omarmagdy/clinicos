@@ -4,7 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { WhatsAppService } from './whatsapp.service';
 
-@Controller('webhooks/whatsapp')
+// Keep the documented webhook URL and the legacy URL working during rollout.
+@Controller(['webhooks/whatsapp', 'whatsapp/webhook'])
 export class WhatsAppWebhookController {
   constructor(private readonly config: ConfigService, private readonly whatsapp: WhatsAppService) {}
 

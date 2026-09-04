@@ -214,6 +214,34 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     return messages.length;
   }
 
+  /** Queue and immediately process one reminder from the test button. */
+  async sendReminderTest(organizationId: string, appointmentId: string) {
+    const appointment = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, organizationId },
+      include: { patient: true },
+    });
+    if (!appointment) throw new NotFoundException('Appointment not found');
+    if (appointment.reminderSentAt) throw new ConflictException('A reminder was already sent for this appointment');
+    const connection = await this.prisma.whatsAppConnection.findUnique({ where: { organizationId } });
+    if (!connection?.isEnabled) throw new ConflictException('WhatsApp sending is disabled');
+    if (!connection.appointmentTemplate) throw new ConflictException('Appointment template is not configured');
+    if (!appointment.patient.marketingConsent) throw new ConflictException('Patient has not granted WhatsApp consent');
+    const phone = this.normalizePhone(appointment.patient.phone);
+    if (!phone) throw new ConflictException('Patient phone number is invalid');
+    const message = await this.prisma.whatsAppMessage.create({
+      data: {
+        organizationId,
+        patientId: appointment.patientId,
+        appointmentId,
+        direction: 'outbound',
+        status: 'pending',
+        payload: { type: 'appointment_reminder', phone, templateName: connection.appointmentTemplate, language: connection.templateLanguage },
+      },
+    });
+    await this.processReminderQueue(1);
+    return this.prisma.whatsAppMessage.findUnique({ where: { id: message.id } });
+  }
+
   async handleWebhook(payload: unknown) {
     const entries = (payload as MetaWebhookPayload)?.entry ?? [];
     for (const entry of entries) for (const change of entry.changes ?? []) {
