@@ -139,6 +139,7 @@ export default function DashboardPage() {
               {owner && <Action href="/settings/services" title="كتالوج الخدمات" text="أضف وعدّل وعطّل خدمات تخصص العيادة، وتظهر في الحجز والعروض." tone="teal" />}
               {owner && <Action href="/settings/subscription" title="الاشتراك والفوترة" text="راجع خطتك وحدود الاستخدام وطلبات التفعيل." tone="teal" />}
               {owner && <Action href="/campaigns" title="عروض WhatsApp" text={`${specialtyAction.campaign} — راجع المستلمين قبل الإرسال.`} tone="teal" />}
+              {owner && <Action href="/reminders" title="تذكيرات المواعيد" text="تابع تذكيرات البريد الإلكتروني وحالة إرسالها قبل المواعيد." tone="teal" />}
               {doctor && <Action href="/patients" title="الوصفة الإلكترونية" text="افتح ملف المريض ثم أنشئ وصفة قابلة للطباعة." tone="teal" />}
             </div>
           </div>

@@ -51,6 +51,7 @@ model Organization {
   subscriptionEvents       SubscriptionEvent[]
   messagingQuotaViolations MessagingQuotaViolation[]
   whatsappMessages         WhatsAppMessage[]
+  appointmentReminders     AppointmentReminder[]
   whatsappIntegration      WhatsAppIntegration?
 
   @@map("organizations")
@@ -219,6 +220,7 @@ model Patient {
   visits                      Visit[]
   marketingCampaignRecipients MarketingCampaignRecipient[]
   whatsappMessages            WhatsAppMessage[]
+  appointmentReminders        AppointmentReminder[]
 
   @@unique([organizationId, medicalRecordNumber])
   @@index([organizationId, lastName, firstName])
@@ -398,10 +400,34 @@ model Appointment {
   whatsappReminderSentAt    DateTime?
   whatsappReminderMessageId String?
   whatsappMessages          WhatsAppMessage[]
+  reminders                 AppointmentReminder[]
 
   @@index([organizationId, scheduledAt])
   @@index([organizationId, patientId])
   @@map("appointments")
+}
+
+model AppointmentReminder {
+  id             String   @id @default(cuid())
+  organizationId String
+  appointmentId  String
+  patientId      String
+  channel        String   // email | sms | whatsapp | in_app
+  status         String   @default("pending") // pending | sent | failed | skipped
+  scheduledAt    DateTime
+  sentAt         DateTime?
+  providerId     String?
+  error          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointment  Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([appointmentId, channel])
+  @@index([organizationId, status, scheduledAt])
+  @@map("appointment_reminders")
 }
 
 // ============================================================================
