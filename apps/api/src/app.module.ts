@@ -9,6 +9,7 @@ import { UserModule } from './modules/user/user.module';
 import { HealthModule } from './modules/health/health.module';
 import { PatientModule } from './modules/patient/patient.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
+import { RemindersModule } from './modules/reminders/reminders.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
     UserModule,
     PatientModule,
     WhatsAppModule,
+    RemindersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
