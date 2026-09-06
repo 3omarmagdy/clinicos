@@ -14,6 +14,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
+import { RemindersModule } from './modules/reminders/reminders.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
     PlatformModule,
     SubscriptionModule,
     WhatsAppModule,
+    RemindersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
