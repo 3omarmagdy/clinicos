@@ -35,3 +35,20 @@ describe('PLAN_CATALOG WhatsApp entitlements', () => {
     expect(PLAN_CATALOG.CENTER).toMatchObject({ priceEgp: null, whatsappMonthlyMessages: null, whatsappUtilityMessages: null, whatsappMarketingMessages: null });
   });
 });
+
+
+  it('rejects WhatsApp access after the trial expires', async () => {
+    const prisma = { subscription: { findFirst: jest.fn().mockResolvedValue({ id: 'sub-1', organizationId: 'org-1', plan: 'FREE_TRIAL', status: 'TRIALING', trialEndsAt: new Date(Date.now() - 86_400_000), currentPeriodEnd: null }), update: jest.fn().mockResolvedValue({ plan: 'FREE_TRIAL', status: 'EXPIRED', trialEndsAt: new Date(Date.now() - 86_400_000), currentPeriodEnd: null }), }, organization: { update: jest.fn() } };
+    const service = new SubscriptionService(prisma as never, {} as never, {} as never);
+
+    await expect(service.assertFeatureAccess('org-1', 'whatsapp')).rejects.toThrow('active subscription');
+    expect(prisma.organization.update).toHaveBeenCalledWith({ where: { id: 'org-1' }, data: { subscriptionStatus: 'expired' } });
+  });
+
+  it('rejects WhatsApp access after a paid period ends', async () => {
+    const prisma = { subscription: { findFirst: jest.fn().mockResolvedValue({ id: 'sub-1', organizationId: 'org-1', plan: 'STARTER', status: 'ACTIVE', trialEndsAt: null, currentPeriodEnd: new Date(Date.now() - 86_400_000) }), update: jest.fn().mockResolvedValue({ plan: 'STARTER', status: 'PAST_DUE', trialEndsAt: null, currentPeriodEnd: new Date(Date.now() - 86_400_000) }), }, organization: { update: jest.fn() } };
+    const service = new SubscriptionService(prisma as never, {} as never, {} as never);
+
+    await expect(service.assertFeatureAccess('org-1', 'whatsapp')).rejects.toThrow('active subscription');
+    expect(prisma.subscription.update).toHaveBeenCalledWith({ where: { id: 'sub-1' }, data: { status: 'PAST_DUE' } });
+  });
