@@ -77,3 +77,7 @@
 ## CORS
 
 تم تعديل CORS ليستخدم allowlist صريحة. يدعم `FRONTEND_URL` و`FRONTEND_URLS` كقائمة مفصولة بفواصل، مع إبقاء localhost للتطوير فقط، ويرفض Origins غير المعروفة. لا يُستخدم wildcard مع `credentials: true`.
+
+## الاختبارات الآلية المضافة
+
+أضيف اختباران لـ`RequestLoggingFilter`: أحدهما يتحقق من رد أخطاء HTTP المعروفة مع `requestId`، والآخر يتحقق من إخفاء تفاصيل الاستثناءات غير المعروفة. بعد الإضافة نجحت مجموعة API كاملة: **10 suites / 43 tests**.
