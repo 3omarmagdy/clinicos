@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 export type WhatsAppIntegrationConfig = {
   organizationId: string;
@@ -47,9 +48,10 @@ type IntegrationRecord = {
 export class WhatsAppIntegrationService {
   private legacySchemaRepair: Promise<void> | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly subscriptions?: SubscriptionService) {}
 
   async upsert(organizationId: string, input: IntegrationInput): Promise<void> {
+    await this.subscriptions?.assertFeatureAccess(organizationId, 'whatsapp');
     await this.ensureLegacyIntegrationSchema();
     const existing = await this.prisma.whatsAppIntegration.findUnique({ where: { organizationId } }) as IntegrationRecord | null;
     const accessToken = input.accessToken?.trim() || (existing ? this.decryptRecord(existing).accessToken : '');

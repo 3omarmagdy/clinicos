@@ -32,6 +32,7 @@ export default function WhatsAppSettingsPage() {
   const [connecting, setConnecting] = useState(false);
   const codeRef = useRef<string | null>(null);
   const detailsRef = useRef<SignupDetails | null>(null);
+  const finishInFlightRef = useRef(false);
   const allowed = hasSessionPermission('organization:update');
 
   const refresh = useCallback(async () => {
@@ -54,7 +55,8 @@ export default function WhatsAppSettingsPage() {
   const finishSignup = useCallback(async () => {
     const code = codeRef.current;
     const details = detailsRef.current;
-    if (!code || !details || !embedded) return;
+    if (!code || !details || !embedded || finishInFlightRef.current) return;
+    finishInFlightRef.current = true;
     setSaving(true); setError('');
     try {
       const response = await authenticatedFetch('/api/v1/whatsapp/embedded-signup/complete', {
@@ -66,7 +68,7 @@ export default function WhatsAppSettingsPage() {
       codeRef.current = null; detailsRef.current = null;
       await refresh();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'تعذر إكمال الربط.'); }
-    finally { setSaving(false); setConnecting(false); }
+    finally { finishInFlightRef.current = false; setSaving(false); setConnecting(false); }
   }, [embedded, form.appointmentTemplate, form.marketingTemplate, form.templateLanguage, refresh]);
 
   useEffect(() => {
@@ -76,7 +78,7 @@ export default function WhatsAppSettingsPage() {
       if (typeof value === 'string') { try { value = JSON.parse(value); } catch { return; } }
       if (!value || typeof value !== 'object') return;
       const data = value as { type?: string; event?: string; data?: { phone_number_id?: string; waba_id?: string } };
-      if (data.type !== 'WA_EMBEDDED_SIGNUP' || data.event !== 'FINISH' || !data.data?.phone_number_id || !data.data.waba_id) return;
+      if (data.type !== 'WA_EMBEDDED_SIGNUP' || !['FINISH', 'FINISH_ONLY'].includes(data.event || '') || !data.data?.phone_number_id || !data.data.waba_id) return;
       detailsRef.current = { phoneNumberId: data.data.phone_number_id, wabaId: data.data.waba_id };
       void finishSignup();
     };

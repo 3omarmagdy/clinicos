@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PLAN_CATALOG } from '../subscription/subscription.service';
 import { WhatsAppIntegrationService } from './whatsapp-integration.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 type WhatsAppApiResponse = { ok: boolean; status: number; json(): Promise<unknown> };
 type ReminderResult = { appointmentId: string; status: 'sent' | 'skipped' | 'failed'; reason?: string; messageId?: string };
@@ -11,7 +12,7 @@ type ReminderResult = { appointmentId: string; status: 'sent' | 'skipped' | 'fai
 export class WhatsAppService {
   private readonly logger = new Logger('WhatsAppService');
 
-  constructor(private readonly prisma: PrismaService, @Optional() private readonly integrations?: WhatsAppIntegrationService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly integrations?: WhatsAppIntegrationService, @Optional() private readonly subscriptions?: SubscriptionService) {}
 
   async listMessages(organizationId: string) {
     return this.prisma.whatsAppMessage.findMany({
@@ -148,6 +149,7 @@ export class WhatsAppService {
 
   /** Sends one owner-confirmed onboarding message without enabling global sends. */
   async sendTestReminder(organizationId: string, appointmentId: string): Promise<ReminderResult> {
+    await this.subscriptions?.assertFeatureAccess(organizationId, 'whatsapp');
     await this.integrations?.assertAppointmentTemplateReady(organizationId);
     const appointment = await this.prisma.appointment.findFirst({
       where: { id: appointmentId, organizationId },
