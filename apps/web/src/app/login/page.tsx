@@ -93,8 +93,8 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 p-4 bg-blue-50 rounded text-sm text-blue-700">
-          <p className="font-semibold mb-2">Development Credentials:</p>
-          <p>Owner: owner@dev.local</p>
+          <p className="font-semibold mb-2">Admin test access:</p>
+          <p>Admin: owner@dev.local</p>
           <p>Doctor: doctor@dev.local</p>
           <p>Receptionist: receptionist@dev.local</p>
           <p className="mt-2">Password: dev_password_123</p>

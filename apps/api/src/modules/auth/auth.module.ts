@@ -14,12 +14,17 @@ import { PermissionsGuard } from './permissions.guard';
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.getOrThrow<string>('JWT_SECRET'),
-        signOptions: {
-          expiresIn: 900, // 15 minutes in seconds
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        // Keep the session alive across normal navigation and page refreshes.
+        // Production can override this with JWT_EXPIRES_IN (for example, 30d).
+        const expiresIn = configService.get<string>('JWT_EXPIRES_IN') ?? '30d';
+        return {
+          secret: configService.getOrThrow<string>('JWT_SECRET'),
+          signOptions: {
+            expiresIn: /^\d+$/.test(expiresIn) ? Number(expiresIn) : (expiresIn as never),
+          },
+        };
+      },
     }),
   ],
   controllers: [AuthController],

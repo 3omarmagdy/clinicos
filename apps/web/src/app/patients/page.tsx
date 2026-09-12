@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { fetchWithAuth, getAuthToken } from '../../lib/auth';
 
 interface Patient { id: string; medicalRecordNumber: string; firstName: string; lastName: string; phone?: string | null; status: string; }
 
@@ -11,18 +12,17 @@ export default function PatientsPage() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-  const token = typeof window === 'undefined' ? null : window.localStorage.getItem('token');
   const load = useCallback(async () => {
-    if (!token) { window.location.replace('/login'); return; }
+    if (!getAuthToken()) return;
     setLoading(true); setError('');
-    try { const response = await fetch(`${apiUrl}/api/v1/patients`, { headers: { Authorization: `Bearer ${token}` } }); if (!response.ok) throw new Error('Unable to load patients.'); setPatients(await response.json() as Patient[]); }
+    try { const response = await fetchWithAuth(`${apiUrl}/api/v1/patients`); if (!response.ok) throw new Error('Unable to load patients.'); setPatients(await response.json() as Patient[]); }
     catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Unable to load patients.'); }
     finally { setLoading(false); }
-  }, [apiUrl, token]);
+  }, [apiUrl]);
   useEffect(() => { void load(); }, [load]);
   const create = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); const form = new FormData(event.currentTarget); setSaving(true); setError('');
-    try { const response = await fetch(`${apiUrl}/api/v1/patients`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: form.get('firstName'), lastName: form.get('lastName'), medicalRecordNumber: form.get('medicalRecordNumber'), phone: form.get('phone') || undefined }) }); if (!response.ok) throw new Error('Unable to create patient.'); event.currentTarget.reset(); await load(); }
+    try { const response = await fetchWithAuth(`${apiUrl}/api/v1/patients`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: form.get('firstName'), lastName: form.get('lastName'), medicalRecordNumber: form.get('medicalRecordNumber'), phone: form.get('phone') || undefined }) }); if (!response.ok) throw new Error('Unable to create patient.'); event.currentTarget.reset(); await load(); }
     catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Unable to create patient.'); }
     finally { setSaving(false); }
   };

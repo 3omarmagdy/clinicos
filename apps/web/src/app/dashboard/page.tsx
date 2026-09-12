@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { clearAuthAndRedirect, fetchWithAuth, getAuthToken } from '../../lib/auth';
 
 interface CurrentUser {
   id: string;
@@ -12,35 +13,45 @@ interface CurrentUser {
   organizationId: string;
 }
 
+const roleLabels: Record<string, string> = {
+  owner: 'Admin',
+  admin: 'Admin',
+  doctor: 'Doctor',
+  receptionist: 'Receptionist',
+  nurse: 'Nurse',
+  accountant: 'Accountant',
+  custom: 'Custom',
+};
+
 export default function DashboardPage() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const token = window.localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) {
       window.location.replace('/login');
       return;
     }
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-    void fetch(`${apiUrl}/api/v1/users/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    void fetchWithAuth(`${apiUrl}/api/v1/users/me`)
       .then(async (response) => {
-        if (!response.ok) throw new Error('Your session has expired. Please sign in again.');
+        if (response.status === 401) {
+          clearAuthAndRedirect();
+          throw new Error('Your session has expired. Please sign in again.');
+        }
+        if (!response.ok) throw new Error('Unable to load your account right now. Please try again.');
         return response.json() as Promise<CurrentUser>;
       })
       .then(setUser)
       .catch((requestError: unknown) => {
-        window.localStorage.removeItem('token');
         setError(requestError instanceof Error ? requestError.message : 'Unable to load your account.');
       });
   }, []);
 
   const signOut = () => {
-    window.localStorage.removeItem('token');
-    window.location.assign('/login');
+    clearAuthAndRedirect();
   };
 
   return (
@@ -67,12 +78,12 @@ export default function DashboardPage() {
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <div className="rounded-lg bg-sky-50 p-5">
               <p className="text-sm text-sky-800">Signed in as</p>
-              <p className="mt-1 text-xl font-semibold text-slate-900">{user.firstName} {user.lastName}</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900">{user.role === 'owner' || user.role === 'admin' ? 'Admin' : `${user.firstName} ${user.lastName}`}</p>
               <p className="mt-1 text-sm text-slate-600">{user.email}</p>
             </div>
             <div className="rounded-lg bg-slate-100 p-5">
               <p className="text-sm text-slate-600">Access role</p>
-              <p className="mt-1 text-xl font-semibold capitalize text-slate-900">{user.role}</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900">{roleLabels[user.role] ?? user.role}</p>
               <p className="mt-1 text-xs text-slate-500">Organization-scoped session</p>
             </div>
           </div>
