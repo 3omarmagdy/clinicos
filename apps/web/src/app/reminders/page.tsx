@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { authenticatedFetch, getAccessToken } from '@/lib/auth-session';
 
 type Reminder = { id: string; channel: string; status: string; scheduledAt: string; sentAt?: string | null; error?: string | null; patient: { firstName: string; lastName: string; email?: string | null }; appointment: { scheduledAt: string; status: string; service?: { name: string } | null } };
 
@@ -12,10 +13,8 @@ export default function RemindersPage() {
   const [message, setMessage] = useState('جارٍ التحميل…');
 
   useEffect(() => {
-    const token = window.localStorage.getItem('token');
-    if (!token) { window.location.replace('/login'); return; }
-    const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-    void fetch(`${api}/api/v1/reminders`, { headers: { Authorization: `Bearer ${token}` } }).then(async (response) => {
+    if (!getAccessToken()) { window.location.replace('/login'); return; }
+    void authenticatedFetch('/api/v1/reminders').then(async (response) => {
       if (!response.ok) throw new Error('تعذر تحميل التذكيرات');
       return response.json() as Promise<Reminder[]>;
     }).then((data) => { setItems(data); setMessage(data.length ? '' : 'لا توجد تذكيرات مسجلة بعد.'); }).catch((error: unknown) => setMessage(error instanceof Error ? error.message : 'تعذر تحميل التذكيرات'));
