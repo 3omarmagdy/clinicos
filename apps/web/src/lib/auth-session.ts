@@ -29,7 +29,13 @@ export function getAccessToken(): string | null {
   // Remove browser-readable tokens saved by older app versions.
   window.localStorage.removeItem('clinicos.accessToken');
   window.localStorage.removeItem('token');
-  return readCookie(SESSION_COOKIE) ? 'cookie-session' : null;
+  // The real credential is the HttpOnly `clinicos_auth` cookie, which the
+  // browser intentionally does not expose to JavaScript. Do not treat the
+  // optional readable hint cookie as proof of authentication: when the API is
+  // proxied from another Vercel origin the hint can be missing even though the
+  // HttpOnly session is still valid. Each protected API request remains the
+  // server-side source of truth and returns 401 when the session is invalid.
+  return 'cookie-session';
 }
 
 export function setAccessToken(): void {
