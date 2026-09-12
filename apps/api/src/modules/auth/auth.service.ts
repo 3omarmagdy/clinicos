@@ -140,10 +140,18 @@ export class AuthService {
       sessionVersion: user.sessionVersion,
     };
 
-    return {
-      accessToken: this.jwtService.sign(payload),
-      expiresIn: 15 * 60, // 15 minutes in seconds
-    };
+    const configuredExpiry = this.configService.get<string>('JWT_EXPIRES_IN') ?? '30d';
+    const expiresIn = /^\d+$/.test(configuredExpiry)
+      ? Number(configuredExpiry)
+      : configuredExpiry.endsWith('d')
+        ? Number(configuredExpiry.slice(0, -1)) * 24 * 60 * 60
+        : configuredExpiry.endsWith('h')
+          ? Number(configuredExpiry.slice(0, -1)) * 60 * 60
+          : configuredExpiry.endsWith('m')
+            ? Number(configuredExpiry.slice(0, -1)) * 60
+            : 30 * 24 * 60 * 60;
+
+    return { accessToken: this.jwtService.sign(payload), expiresIn };
   }
 
   private assertUserCanSignIn(user: AuthorizedUser): void {
