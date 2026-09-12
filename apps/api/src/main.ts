@@ -41,9 +41,17 @@ async function bootstrap() {
     }),
   );
 
-  // CORS configuration
+  // CORS configuration: credentials require an explicit origin allowlist.
+  const allowedOrigins = new Set(
+    [process.env.FRONTEND_URL, process.env.FRONTEND_URLS, 'http://localhost:3000']
+      .filter(Boolean)
+      .flatMap((value) => value!.split(',').map((origin) => origin.trim()).filter(Boolean)),
+  );
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (requestOrigin, callback) => {
+      if (!requestOrigin || allowedOrigins.has(requestOrigin)) callback(null, true);
+      else callback(new Error('CORS origin is not allowed'), false);
+    },
     credentials: true,
   });
 
