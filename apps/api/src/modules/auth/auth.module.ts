@@ -18,7 +18,9 @@ import { EmailService } from './email.service';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: 900, // 15 minutes in seconds
+          // Keep normal navigation and page refreshes signed in. Production
+          // can override this with JWT_EXPIRES_IN (for example, 30d).
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN') ?? '30d',
         },
       }),
     }),
