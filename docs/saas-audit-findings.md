@@ -63,3 +63,9 @@
 ## مخاطر مفتوحة
 
 ما زال يلزم إضافة اختبارات Controller-level للتأكد من أن كل Route حساس يستخدم `AuthGuard` و`PermissionsGuard`، واختبار أن `PlatformAdminGuard` لا يعتمد على قيمة من الواجهة. كما يلزم اختبار CORS مع Preview وProduction، لأن `FRONTEND_URL` الحالي يقبل أصلًا واحدًا فقط.
+
+## تحسين المراقبة المنفذ لاحقًا
+
+أضيف `RequestLoggingFilter` مركزي. يسجل فقط method/path/status/requestId، ويضيف `requestId` إلى ردود الأخطاء. الأخطاء غير المعروفة تعود برسالة عامة `Internal server error` بدل تسريب تفاصيل داخلية، بينما تبقى رسائل أخطاء التحقق والتحكم المعروفة متاحة للمستخدم.
+
+بعد ذلك نجح type-check وlint واختبارات API: **9 suites / 39 tests**.

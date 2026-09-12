@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { json } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
+import { RequestLoggingFilter } from './request-logging.filter';
 
 async function bootstrap() {
   // Import batches contain up to 1,000 validated patient records. Nest's
@@ -30,6 +31,8 @@ async function bootstrap() {
   });
 
   // Global validation pipe
+  app.useGlobalFilters(new RequestLoggingFilter());
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
