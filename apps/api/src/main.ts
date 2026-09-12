@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { json } from 'express';
@@ -14,7 +15,11 @@ async function bootstrap() {
       if (request.path.endsWith('/whatsapp/webhook')) (request as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
     },
   }));
-  app.use((_request: Request, response: Response, next: NextFunction) => {
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    const incomingRequestId = request.header('x-request-id');
+    const requestId = incomingRequestId && /^[A-Za-z0-9._:-]{1,128}$/.test(incomingRequestId) ? incomingRequestId : randomUUID();
+    (request as Request & { requestId?: string }).requestId = requestId;
+    response.setHeader('X-Request-Id', requestId);
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('X-Frame-Options', 'DENY');
     response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');

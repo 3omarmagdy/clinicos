@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional, UnauthorizedException } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PLAN_CATALOG } from '../subscription/subscription.service';
@@ -175,6 +175,14 @@ export class WhatsAppService {
     organization: { name: string; timezone: string; subscriptionPlan: string };
   }, options: { allowTest?: boolean; bypassQuota?: boolean } = {}): Promise<ReminderResult> {
     if (!appointment.patient.whatsappOptIn) return { appointmentId: appointment.id, status: 'skipped', reason: 'patient_not_opted_in' };
+    if (!options.allowTest && this.subscriptions) {
+      try {
+        await this.subscriptions.assertFeatureAccess(appointment.organizationId, 'whatsapp');
+      } catch (error) {
+        if (error instanceof ForbiddenException) return { appointmentId: appointment.id, status: 'skipped', reason: 'whatsapp_not_included_in_plan' };
+        throw error;
+      }
+    }
     const to = this.normalizePhone(appointment.patient.whatsappPhone || appointment.patient.phone);
     if (!to) return { appointmentId: appointment.id, status: 'skipped', reason: 'missing_or_invalid_phone' };
 
