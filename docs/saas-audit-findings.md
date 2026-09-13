@@ -85,3 +85,9 @@
 ## نتيجة تدقيق Routes والحماية
 
 بعد تصحيح المدقق ليحسب Guards على مستوى الـclass، لم تظهر Routes حساسة غير محمية بـJWT/Permissions باستثناء مسارات worker في WhatsApp. هذه المسارات لا تعتمد على جلسة مستخدم، بل تتحقق من `CRON_SECRET` أو `WHATSAPP_CRON_SECRET` بصيغة Bearer قبل تشغيل التذكيرات. مسارات التكامل والقوالب والرسائل والحملات والاختبار تستخدم JWT و`PermissionsGuard` مع `organizationId` من سياق المصادقة.
+
+## الفحص النهائي
+
+نجحت الفحوصات النهائية على الفرع: `pnpm type-check`، وlint للـAPI والواجهة، و`10 suites / 43 tests` في API، و`git diff --check`. يظهر تحذير واحد غير مانع في صفحة الاشتراك بسبب استخدام `<img>` بدل `next/image`، ولا يرتبط بالمصادقة أو العزل أو WhatsApp.
+
+الفرع نظيف ومتزامن مع `origin/fix/saas-auth-entitlements-security`، وآخر commit هو `5f7a71b`. يبقى PR #46 في حالة Draft عمدًا إلى أن تُجرى اختبارات المتصفح على Preview/Production ويُراجع المستخدم خطة النشر.
