@@ -77,8 +77,12 @@ export default function DashboardPage() {
     })();
   }, [canReadOrganization]);
 
-  if (loading || !user) {
+  if (loading) {
     return <main dir="rtl" className="grid min-h-screen place-items-center bg-[#f5f9fd] p-10 text-[#31506d]">جارٍ تحميل مساحة العمل الآمنة…</main>;
+  }
+
+  if (!user) {
+    return <main dir="rtl" className="grid min-h-screen place-items-center bg-[#f5f9fd] p-10 text-center text-[#31506d]"><div><p className="text-lg font-bold">{error || 'تعذر تحميل الجلسة.'}</p><Link href="/login" className="mt-4 inline-block font-bold text-[#1768a8] underline">تسجيل الدخول</Link></div></main>;
   }
 
   const copy = roleCopy[user.role] ?? roleCopy.admin;

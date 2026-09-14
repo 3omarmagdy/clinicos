@@ -1,4 +1,5 @@
 import { createHmac } from 'crypto';
+import { ForbiddenException } from '@nestjs/common';
 import { WhatsAppService } from './whatsapp.service';
 
 describe('WhatsAppService', () => {
@@ -145,3 +146,33 @@ describe('WhatsAppService', () => {
     });
   });
 });
+
+
+  it('blocks expired subscriptions before a direct WhatsApp reminder request reaches Meta', async () => {
+    process.env.WHATSAPP_SEND_ENABLED = 'true';
+    process.env.WHATSAPP_ACCESS_TOKEN = 'test-token';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'phone-number-id';
+    process.env.WHATSAPP_APPOINTMENT_TEMPLATE = 'clinic_appointment_reminder';
+    const directAppointment = {
+      ...{
+        id: 'appointment-expired',
+        organizationId: 'org-1',
+        scheduledAt: new Date('2026-08-28T09:00:00.000Z'),
+        patient: { id: 'patient-1', firstName: 'محمد', phone: '01012345678', whatsappPhone: null, whatsappOptIn: true },
+        doctor: { firstName: 'أحمد', lastName: 'علي' },
+        organization: { name: 'Clinicos Test Clinic', timezone: 'Africa/Cairo', subscriptionPlan: 'starter' },
+      },
+    };
+    const prisma = {
+      appointment: { findMany: jest.fn().mockResolvedValue([directAppointment]), count: jest.fn(), update: jest.fn() },
+    };
+    const subscriptions = { assertFeatureAccess: jest.fn().mockRejectedValue(new ForbiddenException('This feature requires an active subscription.')) };
+    const service = new WhatsAppService(prisma as never, undefined, subscriptions as never);
+    const fetchMock = jest.spyOn(global, 'fetch');
+
+    const result = await service.runDueReminders();
+
+    expect(result.results[0]).toMatchObject({ status: 'skipped', reason: 'whatsapp_not_included_in_plan' });
+    expect(subscriptions.assertFeatureAccess).toHaveBeenCalledWith('org-1', 'whatsapp');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });

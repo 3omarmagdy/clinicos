@@ -5,6 +5,7 @@ import { json } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { RequestLoggingFilter } from './request-logging.filter';
+import { buildAllowedOrigins } from './cors-policy';
 
 async function bootstrap() {
   // Import batches contain up to 1,000 validated patient records. Nest's
@@ -42,11 +43,7 @@ async function bootstrap() {
   );
 
   // CORS configuration: credentials require an explicit origin allowlist.
-  const allowedOrigins = new Set(
-    [process.env.FRONTEND_URL, process.env.FRONTEND_URLS, 'http://localhost:3000']
-      .filter(Boolean)
-      .flatMap((value) => value!.split(',').map((origin) => origin.trim()).filter(Boolean)),
-  );
+  const allowedOrigins = buildAllowedOrigins();
   app.enableCors({
     origin: (requestOrigin, callback) => {
       if (!requestOrigin || allowedOrigins.has(requestOrigin)) callback(null, true);

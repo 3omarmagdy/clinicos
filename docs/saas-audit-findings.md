@@ -91,3 +91,21 @@
 نجحت الفحوصات النهائية على الفرع: `pnpm type-check`، وlint للـAPI والواجهة، و`10 suites / 43 tests` في API، و`git diff --check`. يظهر تحذير واحد غير مانع في صفحة الاشتراك بسبب استخدام `<img>` بدل `next/image`، ولا يرتبط بالمصادقة أو العزل أو WhatsApp.
 
 الفرع نظيف ومتزامن مع `origin/fix/saas-auth-entitlements-security`، وآخر commit هو `5f7a71b`. يبقى PR #46 في حالة Draft عمدًا إلى أن تُجرى اختبارات المتصفح على Preview/Production ويُراجع المستخدم خطة النشر.
+
+## اختبار النطاقات وPreview في 14 سبتمبر 2026
+
+تمت مطابقة PR #46 مع commit الرأس `e557def818f08aed06d6dfc7e7ee72d27a61ac6a`، وهو نفس commit الفرع المحلي والفرع البعيد. لم يوجد ملف PDF داخل مساحة العمل الحالية يمكن ربطه بالـPR؛ لذلك لا يمكن إثبات commit خاص بـPDF دون تزويد ملف PDF أو رابط مصدره.
+
+نطاق الواجهة Production `https://clinicos-crm.vercel.app` يعرض صفحة Clinicos العامة بنجاح. نطاق الواجهة Preview المرتبط بـPR هو `https://clinicos-crm-git-fix-saas-auth-entitlements-security-omarmagdy.vercel.app` ويعرض الصفحة العامة بنجاح. نطاق Preview الخاص بالـAPI هو `https://clinicos-api-git-fix-saas-auth-entitlements-security-omarmagdy.vercel.app`، لكنه محمي بتسجيل دخول Vercel SSO عند الوصول الخارجي؛ لذلك تعذر تنفيذ اختبار CORS/401 عليه من خارج جلسة Vercel. نطاق `https://clinicos-4efctwzb2-omarmagdy.vercel.app` الذي جُرّب سابقًا يعيد `Cannot GET /`، وهو نطاق API/Deployment غير صالح كواجهة.
+
+على API Production الحالي `https://clinicos-api-three.vercel.app` أعاد `/api/v1/users/me` حالة 401 دون بيانات حساسة، وظهر CORS للواجهة Production. عند إرسال Origin غير معروف، ظهر نفس `Access-Control-Allow-Origin` الخاص بالواجهة؛ هذا يشير إلى أن النشر الحالي ليس دليلًا على كود PR #46 أو أن إعداد CORS يحتاج إعادة نشر ومراجعة، ولذلك لا يُعتبر اختبار Origin غير المعروف ناجحًا حتى يتم اختبار Deployment الخاص بالـPR بعد إتاحة Preview API.
+
+## الاختبارات المضافة بعد الاستئناف
+
+أضيفت اختبارات Playwright فعلية للواجهة تغطي Refresh، فتح تبويب جديد ضمن نفس السياق، التنقل بين Dashboard وAppointments وReminders، انتهاء جلسة JWT عبر 401، وعودة 500 من Endpoint فرعي دون Logout عام. نجحت الاختبارات الثلاثة محليًا. كشف اختبار انتهاء الجلسة خللًا حقيقيًا في Dashboard كان يعرض شاشة التحميل إلى ما لا نهاية عند غياب `user` بعد 401؛ تم إصلاحه ليعرض رسالة انتهاء الجلسة ورابط تسجيل الدخول.
+
+أضيفت اختبارات Controller-level لـAppointment/ClinicalRecord/Patient guards، وPlatformAdminGuard، ومسارات WhatsApp الحساسة، إضافة إلى اختبارات PermissionsGuard وPlatformAdminGuard لحالات السماح و403. أضيف اختبار مباشر يمنع WhatsApp عند الاشتراك المنتهي قبل استدعاء Meta، وتبقى اختبارات الحملات والتذكيرات الحالية ناجحة.
+
+أضيفت سياسة CORS مستقلة قابلة للاختبار. في Production تُقبل `FRONTEND_URL` و`FRONTEND_URLS` فقط، ولا يُسمح بـlocalhost تلقائيًا؛ خارج Production يُسمح بـlocalhost للتطوير. نجحت 3 اختبارات CORS.
+
+تم تنفيذ smoke test على واجهة Production وواجهة Preview الخاصة بـPR #46، وكلاهما يعرض الصفحة العامة وصفحة تسجيل الدخول. أما API Preview فمحمي بـVercel SSO من خارج الجلسة، لذلك لم يمكن اختبار CORS/401 الفعلي عليه. هذا فشل تشغيلي في قابلية الاختبار، وليس فشلًا في كود API؛ يجب إتاحة Preview API للمراجعين أو تنفيذ الاختبار من جلسة Vercel مصرح بها.
