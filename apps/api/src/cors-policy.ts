@@ -1,4 +1,4 @@
-export function buildAllowedOrigins(env: NodeJS.ProcessEnv = process.env): Set<string> {
+export function buildAllowedOrigins(env: Record<string, string | undefined> = process.env): Set<string> {
   const configured = [env.FRONTEND_URL, env.FRONTEND_URLS]
     .filter(Boolean)
     .flatMap((value) => value!.split(',').map((origin) => origin.trim()).filter(Boolean));
