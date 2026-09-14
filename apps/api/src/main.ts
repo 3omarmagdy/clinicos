@@ -47,7 +47,12 @@ async function bootstrap() {
   app.enableCors({
     origin: (requestOrigin, callback) => {
       if (!requestOrigin || allowedOrigins.has(requestOrigin)) callback(null, true);
-      else callback(new Error('CORS origin is not allowed'), false);
+      // Reject unknown browser origins without throwing an exception. Throwing
+      // here turns a normal CORS denial into a 500 response and can expose
+      // internal error handling details. The cors middleware will omit CORS
+      // headers for the denied origin while the application keeps its normal
+      // response behavior.
+      else callback(null, false);
     },
     credentials: true,
   });
