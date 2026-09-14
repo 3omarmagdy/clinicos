@@ -115,3 +115,11 @@
 نجح تحميل صفحة `/login` على واجهة Production `clinicos-crm.vercel.app` وواجهة Preview المرتبطة بـPR #46، مع ظهور حقول رمز العيادة والبريد وكلمة المرور وزر الدخول. لم يتم إدخال أي بيانات أو إرسال أي نموذج.
 
 بعد اكتمال Deployment للـcommit `65e61dc` ونجاح CI، ظل API Preview محميًا بـVercel SSO؛ جميع محاولات `/api/v1/users/me` وOPTIONS أعادت 302 إلى Vercel SSO قبل وصول الطلب إلى Nest. لذلك تبقى نتيجة CORS/401 الفعلية على Preview **غير قابلة للتحقق خارجيًا** حتى يُسمح بالوصول العام أو يُنفّذ الاختبار داخل جلسة Vercel مصرح بها. هذا هو العائق التشغيلي الرئيسي قبل الدمج.
+
+## تحقق Preview API الأخير قبل الدمج
+
+رأس PR #46 والفرع المحلي والبعيد متطابق مع `0698e143719c76af1823b7f039c45c8368f48974`. أظهر GitHub/Vercel أن Deployment `clinicos-api` المرتبط بالفرع حالته Ready، ورابطه `https://clinicos-api-git-fix-saas-auth-entitlements-security-omarmagdy.vercel.app`.
+
+تم اختبار هذا الرابط من خارج جلسة Vercel. النتائج لكل من Origin `https://clinicos-crm.vercel.app` وOrigin `https://clinicos-crm-git-fix-saas-auth-entitlements-security-omarmagdy.vercel.app` وOrigin غير معروف `https://unknown-origin.example` كانت جميعًا `HTTP 302` إلى Vercel SSO، قبل وصول الطلب إلى Nest. كما أعاد طلب OPTIONS `HTTP 302`، وأعاد طلب API بدون JWT `HTTP 302`، وليس `401`. لذلك لا يمكن استنتاج `Access-Control-Allow-Origin` من Preview API الحالي، ولم يتم تعطيل SSO أو تغيير إعداداته.
+
+هذا يعني أن شرط التحقق الداخلي لـPreview API لم ينجح بعد بسبب حماية Vercel، بينما تحققنا من commit وReady deployment فقط. يجب تنفيذ نفس الطلبات داخل جلسة Vercel مصرح بها أو تعطيل SSO مؤقتًا من إعدادات Preview API يدويًا، ثم إعادته فورًا قبل الدمج.
