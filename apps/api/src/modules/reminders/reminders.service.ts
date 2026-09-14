@@ -14,7 +14,7 @@ type AppointmentForReminder = {
 @Injectable()
 export class RemindersService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RemindersService.name);
-  private timer?: NodeJS.Timeout;
+  private timer?: ReturnType<typeof setInterval>;
 
   constructor(private readonly prisma: PrismaService, private readonly config: ConfigService) {}
 

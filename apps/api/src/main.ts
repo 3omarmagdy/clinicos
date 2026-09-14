@@ -1,8 +1,11 @@
+import { randomUUID } from 'crypto';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { json } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
+import { RequestLoggingFilter } from './request-logging.filter';
+import { buildAllowedOrigins } from './cors-policy';
 
 async function bootstrap() {
   // Import batches contain up to 1,000 validated patient records. Nest's
@@ -14,7 +17,11 @@ async function bootstrap() {
       if (request.path.endsWith('/whatsapp/webhook')) (request as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
     },
   }));
-  app.use((_request: Request, response: Response, next: NextFunction) => {
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    const incomingRequestId = request.header('x-request-id');
+    const requestId = incomingRequestId && /^[A-Za-z0-9._:-]{1,128}$/.test(incomingRequestId) ? incomingRequestId : randomUUID();
+    (request as Request & { requestId?: string }).requestId = requestId;
+    response.setHeader('X-Request-Id', requestId);
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('X-Frame-Options', 'DENY');
     response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -25,6 +32,8 @@ async function bootstrap() {
   });
 
   // Global validation pipe
+  app.useGlobalFilters(new RequestLoggingFilter());
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -33,9 +42,18 @@ async function bootstrap() {
     }),
   );
 
-  // CORS configuration
+  // CORS configuration: credentials require an explicit origin allowlist.
+  const allowedOrigins = buildAllowedOrigins();
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (requestOrigin, callback) => {
+      if (!requestOrigin || allowedOrigins.has(requestOrigin)) callback(null, true);
+      // Reject unknown browser origins without throwing an exception. Throwing
+      // here turns a normal CORS denial into a 500 response and can expose
+      // internal error handling details. The cors middleware will omit CORS
+      // headers for the denied origin while the application keeps its normal
+      // response behavior.
+      else callback(null, false);
+    },
     credentials: true,
   });
 
